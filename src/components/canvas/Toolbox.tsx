@@ -1,52 +1,96 @@
 'use client';
+import { useState } from 'react';
 
 export default function Toolbox() {
+  const [selectedTool, setSelectedTool] = useState<string | null>(null);
+
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
   };
 
   return (
-    <div className="absolute top-4 left-4 z-10 w-48 bg-white shadow-xl rounded-xl border border-gray-200 p-4 flex flex-col gap-2">
-      <h3 className="text-sm font-bold text-gray-800 mb-1 border-b pb-2">Toolbox</h3>
-      
-      <div className="text-[10px] uppercase text-gray-400 font-bold mt-1">Triggers</div>
-      <div 
-        className="p-2 border-2 border-green-400 bg-green-50 rounded text-xs font-bold text-green-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-green-100"
-        onDragStart={(e) => onDragStart(e, 'webhook')} draggable>
-        Webhook
+    <div className="absolute top-4 left-4 z-10 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d]" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
+      <h3 className="text-lg font-bold text-[#2d2d2d] mb-4 border-b-2 border-[#2d2d2d] pb-2 uppercase tracking-widest">Projects</h3>
+      <div className="space-y-3">
+        
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'webhook')} 
+          onClick={() => setSelectedTool('webhook')}
+          draggable
+        >
+          <div className="font-bold text-green-400">[+] Radio Tower</div>
+          <div className="text-xs text-gray-400 mt-1">Triggers the workflow</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'httpRequest')} 
+          draggable
+        >
+          <div className="font-bold text-teal-400">[*] Data Center</div>
+          <div className="text-xs text-gray-400 mt-1">Make HTTP requests</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'geminiFactory')} 
+          draggable
+        >
+          <div className="font-bold text-blue-400">[~] AI Factory</div>
+          <div className="text-xs text-gray-400 mt-1">Process with Gemini AI</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'conditional')} 
+          draggable
+        >
+          <div className="font-bold text-yellow-400">[?] Toll Booth</div>
+          <div className="text-xs text-gray-400 mt-1">If/Else Logic Gate</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'delay')} 
+          draggable
+        >
+          <div className="font-bold text-gray-300">[-] Truck Stop</div>
+          <div className="text-xs text-gray-400 mt-1">Wait for specified time</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'output')} 
+          draggable
+        >
+          <div className="font-bold text-orange-400">[=] Delivery Dock</div>
+          <div className="text-xs text-gray-400 mt-1">Final output destination</div>
+        </div>
+
       </div>
 
-      <div className="text-[10px] uppercase text-gray-400 font-bold mt-2">Actions</div>
-      <div 
-        className="p-2 border-2 border-blue-400 bg-blue-50 rounded text-xs font-bold text-blue-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-blue-100"
-        onDragStart={(e) => onDragStart(e, 'geminiFactory')} draggable>
-        Gemini Factory
-      </div>
-      <div 
-        className="p-2 border-2 border-teal-400 bg-teal-50 rounded text-xs font-bold text-teal-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-teal-100"
-        onDragStart={(e) => onDragStart(e, 'httpRequest')} draggable>
-        HTTP Request
-      </div>
-      
-      <div className="text-[10px] uppercase text-gray-400 font-bold mt-2">Logic</div>
-      <div 
-        className="p-2 border-2 border-yellow-400 bg-yellow-50 rounded text-xs font-bold text-yellow-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-yellow-100"
-        onDragStart={(e) => onDragStart(e, 'conditional')} draggable>
-        Conditional
-      </div>
-      <div 
-        className="p-2 border-2 border-gray-600 bg-gray-50 rounded text-xs font-bold text-gray-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-gray-100"
-        onDragStart={(e) => onDragStart(e, 'delay')} draggable>
-        Delay
-      </div>
-
-      <div className="text-[10px] uppercase text-gray-400 font-bold mt-2">Outputs</div>
-      <div 
-        className="p-2 border-2 border-orange-400 bg-orange-50 rounded text-xs font-bold text-orange-800 cursor-grab active:cursor-grabbing text-center transition-colors hover:bg-orange-100"
-        onDragStart={(e) => onDragStart(e, 'output')} draggable>
-        Output Node
-      </div>
+      {/* Asset Preview Panel */}
+      {selectedTool && (
+        <div className="absolute top-0 left-[300px] z-20 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d]" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
+          <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
+            <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Asset Preview</h3>
+            <button onClick={() => setSelectedTool(null)} className="text-red-500 hover:text-red-700 font-bold text-xl px-2">X</button>
+          </div>
+          <div className="bg-[#2d2d2d] p-4 flex items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
+            {selectedTool === 'webhook' && <img src="/assets/webhook_tower.png" alt="Radio Tower" className="w-full object-contain" style={{ imageRendering: 'auto' }} />}
+            {/* We will add other tools here as we create them */}
+          </div>
+          <p className="mt-3 text-sm text-[#2d2d2d] font-bold text-center">Drag from the toolbox to place</p>
+        </div>
+      )}
     </div>
   );
 }

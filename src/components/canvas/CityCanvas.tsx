@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   ReactFlow,
-  Background,
   Controls,
   applyNodeChanges,
   applyEdgeChanges,
@@ -28,6 +27,9 @@ import DelayNode from './nodes/DelayNode';
 import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
 
+import RoadEdge from './RoadEdge';
+import IsometricBackground from './IsometricBackground';
+
 const nodeTypes = {
   webhook: WebhookNode,
   geminiFactory: GeminiFactoryNode,
@@ -35,6 +37,10 @@ const nodeTypes = {
   httpRequest: HttpRequestNode,
   conditional: ConditionalNode,
   delay: DelayNode,
+};
+
+const edgeTypes = {
+  road: RoadEdge,
 };
 
 // Start empty by default, they will either be loaded or manually added via toolbox
@@ -162,57 +168,60 @@ export default function CityCanvas() {
   const handleRun = async () => {
     if (isRunning) return;
     
-    const hasGemini = nodes.some(n => n.type === 'geminiFactory');
-    const hasOutput = nodes.some(n => n.type === 'output');
-    
-    if (!hasGemini || !hasOutput) {
-      alert("Missing required nodes! (Gemini Factory or Output)");
+    const startNode = nodes.find(n => n.type === 'webhook');
+    if (!startNode) {
+      alert("Missing Radio Tower (Webhook) trigger!");
       return;
     }
 
     setIsRunning(true);
+    
+    // Reset state
+    setNodes(nds => nds.map(node => ({ ...node, data: { ...node.data, isLoading: false, output: undefined } })));
+    setEdges(eds => eds.map(edge => ({ ...edge, data: { ...edge.data, isAnimating: false } })));
 
-    setNodes(nds => nds.map(node => {
-      if (node.type === 'geminiFactory') {
-        return { ...node, data: { ...node.data, isLoading: true } };
-      }
-      if (node.type === 'output') {
-         return { ...node, data: { ...node.data, output: "Waiting for output..." } };
-      }
-      return node;
-    }));
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+    
+    // Trigger backend execution silently in background
+    fetch('/api/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nodes, edges })
+    }).catch(console.error);
 
-    try {
-      const res = await fetch('/api/execute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges })
-      });
-      const data = await res.json();
-
-      if (data.error) throw new Error(data.error);
-
-      alert("Workflow queued! Check your terminal for background execution logs.");
+    // Visual Simulation Loop
+    let currentNodeId = startNode.id;
+    let maxSteps = 20; // safety limit
+    
+    while (currentNodeId && maxSteps > 0) {
+      maxSteps--;
+      const outgoingEdge = edges.find(e => e.source === currentNodeId);
+      if (!outgoingEdge) break;
       
-      setNodes(nds => nds.map(node => {
-        if (node.type === 'geminiFactory') {
-          return { ...node, data: { ...node.data, isLoading: false } };
-        }
-        return node;
-      }));
-    } catch (err: any) {
-      console.error(err);
-      alert("Error: " + err.message);
+      // 1. Dispatch Truck
+      setEdges(eds => eds.map(e => e.id === outgoingEdge.id ? { ...e, data: { ...e.data, isAnimating: true } } : e));
+      await sleep(2000); // wait for truck to arrive (matches SVG dur="2s")
+      setEdges(eds => eds.map(e => e.id === outgoingEdge.id ? { ...e, data: { ...e.data, isAnimating: false } } : e));
       
-      setNodes(nds => nds.map(node => {
-        if (node.type === 'geminiFactory') {
-          return { ...node, data: { ...node.data, isLoading: false } };
-        }
-        return node;
-      }));
-    } finally {
-      setIsRunning(false);
+      // 2. Arrive at Next Node
+      const nextNode = nodes.find(n => n.id === outgoingEdge.target);
+      if (!nextNode) break;
+      
+      // 3. Process Node
+      if (nextNode.type === 'output') {
+        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, output: "Delivery Successful! Workflow Complete." } } : n));
+        break;
+      } else {
+        // Show processing state
+        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, isLoading: true } } : n));
+        await sleep(1500); // processing time
+        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, isLoading: false } } : n));
+      }
+      
+      currentNodeId = nextNode.id;
     }
+
+    setIsRunning(false);
   };
 
   return (
@@ -221,7 +230,7 @@ export default function CityCanvas() {
       <Toolbox />
 
       {/* Main Canvas Area */}
-      <div className="flex-1 h-full w-full" onDragOver={onDragOver} onDrop={onDrop}>
+      <div className="flex-1 h-full w-full relative overflow-hidden bg-[#d2b48c]" onDragOver={onDragOver} onDrop={onDrop}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -230,11 +239,17 @@ export default function CityCanvas() {
           onConnect={onConnect}
           onInit={setReactFlowInstance}
           onNodeClick={onNodeClick}
+          onEdgeClick={(event, edge) => setEdges((eds) => eds.filter((e) => e.id !== edge.id))}
           onPaneClick={() => setSelectedNode(null)}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={{ type: 'road' }}
           fitView
+          snapToGrid={true}
+          snapGrid={[64, 32]}
+          className="bg-transparent"
         >
-          <Background />
+          <IsometricBackground />
           <Controls />
         </ReactFlow>
       </div>
