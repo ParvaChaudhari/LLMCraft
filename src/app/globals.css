@@ -25,6 +25,23 @@ body {
   font-family: 'Pixelify Sans', sans-serif;
 }
 
+/* Remove default React Flow white boxes from ALL custom nodes */
+.react-flow__node,
+.react-flow__node-output,
+.react-flow__node-input,
+.react-flow__node-default,
+.react-flow__node-webhook,
+.react-flow__node-geminiFactory,
+.react-flow__node-httpRequest,
+.react-flow__node-conditional,
+.react-flow__node-delay {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
 img {
   image-rendering: auto;
 }
