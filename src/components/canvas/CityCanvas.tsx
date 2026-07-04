@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, DragEvent } from 'react';
+import { useCallback, useState, useEffect, DragEvent, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -59,6 +59,7 @@ export default function CityCanvas() {
   const [isSaving, setIsSaving] = useState(false);
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
   
   const router = useRouter();
   const supabase = createClient();
@@ -135,6 +136,14 @@ export default function CityCanvas() {
     setSelectedNode(node);
   }, []);
 
+  const updateNodeData = useCallback((nodeId: string, newData: any) => {
+    setNodes((nds) =>
+      nds.map((n) => (n.id === nodeId ? { ...n, data: { ...n.data, ...newData } } : n))
+    );
+    // Also update selectedNode if it's currently open
+    setSelectedNode((prev) => (prev?.id === nodeId ? { ...prev, data: { ...prev.data, ...newData } } : prev));
+  }, []);
+
   const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -175,54 +184,66 @@ export default function CityCanvas() {
       return;
     }
 
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
     setIsRunning(true);
     
     // Reset state
     setNodes(nds => nds.map(node => ({ ...node, data: { ...node.data, isLoading: false, output: undefined } })));
     setEdges(eds => eds.map(edge => ({ ...edge, data: { ...edge.data, isAnimating: false } })));
 
-    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
-    
-    // Trigger backend execution silently in background
-    fetch('/api/execute', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nodes, edges })
-    }).catch(console.error);
+    try {
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes, edges })
+      });
+      const resData = await res.json();
+      
+      if (!resData.workflowId) throw new Error("No workflowId returned");
 
-    // Visual Simulation Loop
-    let currentNodeId = startNode.id;
-    let maxSteps = 20; // safety limit
-    
-    while (currentNodeId && maxSteps > 0) {
-      maxSteps--;
-      const outgoingEdge = edges.find(e => e.source === currentNodeId);
-      if (!outgoingEdge) break;
-      
-      // 1. Dispatch Truck
-      setEdges(eds => eds.map(e => e.id === outgoingEdge.id ? { ...e, data: { ...e.data, isAnimating: true } } : e));
-      await sleep(2000); // wait for truck to arrive (matches SVG dur="2s")
-      setEdges(eds => eds.map(e => e.id === outgoingEdge.id ? { ...e, data: { ...e.data, isAnimating: false } } : e));
-      
-      // 2. Arrive at Next Node
-      const nextNode = nodes.find(n => n.id === outgoingEdge.target);
-      if (!nextNode) break;
-      
-      // 3. Process Node
-      if (nextNode.type === 'output') {
-        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, output: "Delivery Successful! Workflow Complete." } } : n));
-        break;
-      } else {
-        // Show processing state
-        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, isLoading: true } } : n));
-        await sleep(1500); // processing time
-        setNodes(nds => nds.map(n => n.id === nextNode.id ? { ...n, data: { ...n.data, isLoading: false } } : n));
-      }
-      
-      currentNodeId = nextNode.id;
+      const eventSource = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const { event: eventName, data: eventData } = payload;
+
+          if (eventName === 'NODE_STARTED') {
+            setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
+          } 
+          else if (eventName === 'NODE_FINISHED') {
+            setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
+            
+            // Check if it's an output node to visually enable the Run button again
+            // But we do NOT close the eventSource, so parallel branches can still finish!
+            const finishedNode = nodes.find(n => n.id === eventData.nodeId);
+            if (finishedNode?.type === 'output') {
+              setIsRunning(false);
+            }
+          }
+          else if (eventName === 'EDGE_TRAVERSED') {
+            setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: true } } : e));
+            
+            setTimeout(() => {
+              setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: false } } : e));
+            }, 2000);
+          }
+        } catch(e) {}
+      };
+
+      eventSource.onerror = (err) => {
+        console.error("SSE Error:", err);
+        eventSource.close();
+        setIsRunning(false);
+      };
+    } catch (err) {
+      console.error(err);
+      setIsRunning(false);
     }
-
-    setIsRunning(false);
   };
 
   return (
@@ -277,7 +298,11 @@ export default function CityCanvas() {
       </div>
 
       {/* Sliding Side Panel */}
-      <SidePanel selectedNode={selectedNode} onClose={() => setSelectedNode(null)} />
+      <SidePanel 
+        selectedNode={selectedNode} 
+        onClose={() => setSelectedNode(null)} 
+        updateNodeData={updateNodeData}
+      />
     </div>
   );
 }

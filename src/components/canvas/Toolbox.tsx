@@ -1,6 +1,15 @@
 'use client';
 import { useState } from 'react';
 
+const toolAssets: Record<string, string> = {
+  webhook: 'webhook_tower.png',
+  httpRequest: 'http_request.png',
+  geminiFactory: 'gemini_factory.png',
+  conditional: 'conditional_gate.png',
+  delay: 'delay_stop.png',
+  output: 'output_dock.png'
+};
+
 export default function Toolbox() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
 
@@ -29,6 +38,7 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'httpRequest')} 
+          onClick={() => setSelectedTool('httpRequest')}
           draggable
         >
           <div className="font-bold text-teal-400">[*] Data Center</div>
@@ -39,6 +49,7 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'geminiFactory')} 
+          onClick={() => setSelectedTool('geminiFactory')}
           draggable
         >
           <div className="font-bold text-blue-400">[~] AI Factory</div>
@@ -49,6 +60,7 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'conditional')} 
+          onClick={() => setSelectedTool('conditional')}
           draggable
         >
           <div className="font-bold text-yellow-400">[?] Toll Booth</div>
@@ -59,6 +71,7 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'delay')} 
+          onClick={() => setSelectedTool('delay')}
           draggable
         >
           <div className="font-bold text-gray-300">[-] Truck Stop</div>
@@ -69,6 +82,7 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'output')} 
+          onClick={() => setSelectedTool('output')}
           draggable
         >
           <div className="font-bold text-orange-400">[=] Delivery Dock</div>
@@ -85,8 +99,14 @@ export default function Toolbox() {
             <button onClick={() => setSelectedTool(null)} className="text-red-500 hover:text-red-700 font-bold text-xl px-2">X</button>
           </div>
           <div className="bg-[#2d2d2d] p-4 flex items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
-            {selectedTool === 'webhook' && <img src="/assets/webhook_tower.png" alt="Radio Tower" className="w-full object-contain" style={{ imageRendering: 'auto' }} />}
-            {/* We will add other tools here as we create them */}
+            {toolAssets[selectedTool] && (
+              <img 
+                src={`/assets/${toolAssets[selectedTool]}`} 
+                alt={`${selectedTool} Preview`} 
+                className="w-full object-contain" 
+                style={{ imageRendering: 'auto' }} 
+              />
+            )}
           </div>
           <p className="mt-3 text-sm text-[#2d2d2d] font-bold text-center">Drag from the toolbox to place</p>
         </div>

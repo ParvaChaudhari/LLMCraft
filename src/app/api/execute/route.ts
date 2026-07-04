@@ -13,15 +13,16 @@ export async function POST(req: Request) {
     }
 
     // Push the first job to the queue
+    const workflowId = `exec-${Date.now()}`;
     await workflowQueue.add('execute-node', {
-      workflowId: `exec-${Date.now()}`,
+      workflowId,
       nodeId: startNode.id,
       nodes,
       edges,
       context: {}
     });
 
-    return NextResponse.json({ message: "Workflow queued successfully!" });
+    return NextResponse.json({ message: "Workflow queued successfully!", workflowId });
   } catch (error: any) {
     console.error("Execution API Error:", error);
     return NextResponse.json({ error: error.message || "Failed to start execution" }, { status: 500 });
