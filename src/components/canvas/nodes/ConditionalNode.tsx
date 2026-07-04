@@ -3,10 +3,10 @@ import DiamondHighlight from './DiamondHighlight';
 
 export default function ConditionalNode({ data, selected }: { data: any, selected?: boolean }) {
   return (
-    <div className="relative group" style={{ width: 164, height: 96 }}>
+    <div className="relative group" style={{ width: 192, height: 96 }}>
       {selected && <DiamondHighlight />}
 
-      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-yellow-500 border-none rounded-full z-10" style={{ left: -12, top: '50%' }} />
+      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-yellow-500 border-none rounded-full z-10" style={{ left: 32, top: 48 }} />
 
       <div className="absolute pointer-events-none" style={{ left: 15, bottom: -87, width: '100%', height: 256, transform: 'scale(1.15)', transformOrigin: 'bottom center' }}>
         <img src="/assets/conditional_gate.png" alt="Conditional" className="w-full h-full object-contain" />
@@ -16,8 +16,8 @@ export default function ConditionalNode({ data, selected }: { data: any, selecte
         Toll Booth Checkpoint
       </div>
 
-      <Handle type="source" position={Position.Right} id="true" className="w-2 h-2 bg-green-500 border-none rounded-full z-10" style={{ right: -12, top: '30%' }} />
-      <Handle type="source" position={Position.Right} id="false" className="w-2 h-2 bg-red-500 border-none rounded-full z-10" style={{ right: -12, top: '70%' }} />
+      <Handle type="source" position={Position.Right} id="true" className="w-2 h-2 bg-green-500 border-none rounded-full z-10" style={{ right: 32, top: 40 }} />
+      <Handle type="source" position={Position.Right} id="false" className="w-2 h-2 bg-red-500 border-none rounded-full z-10" style={{ right: 32, top: 56 }} />
     </div>
   );
 }

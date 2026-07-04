@@ -6,7 +6,7 @@ export default function HttpRequestNode({ data, selected }: { data: any, selecte
     <div className="relative group" style={{ width: 320, height: 160 }}>
       {selected && <DiamondHighlight cols={5} rows={5} />}
 
-      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-teal-500 border-none rounded-full z-10" style={{ left: -12, top: '50%' }} />
+      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-teal-500 border-none rounded-full z-10" style={{ left: 32, top: 80 }} />
 
       <div className="absolute pointer-events-none" style={{ left: 0, bottom: -36, width: '100%', height: 384, transformOrigin: 'bottom center' }}>
         <img src="/assets/http_request.png" alt="HTTP Request" className="w-full h-full object-contain" />
@@ -18,7 +18,7 @@ export default function HttpRequestNode({ data, selected }: { data: any, selecte
         HTTP Data Center
       </div>
 
-      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-teal-500 border-none rounded-full z-10" style={{ right: -12, top: '50%' }} />
+      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-teal-500 border-none rounded-full z-10" style={{ right: 32, top: 80 }} />
     </div>
   );
 }

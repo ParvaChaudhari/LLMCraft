@@ -6,7 +6,7 @@ export default function OutputNode({ data, selected }: { data: any, selected?: b
     <div className="relative group" style={{ width: 256, height: 128 }}>
       {selected && <DiamondHighlight cols={4} rows={4} style={{ left: 32, top: -32 }}/>}
       
-      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-orange-500 border-none rounded-full z-10" style={{ left: -12, top: '50%' }} />
+      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-orange-500 border-none rounded-full z-10" style={{ left: 64, top: 32 }} />
       
       <div className="absolute pointer-events-none" style={{ left: 32, bottom: -16, width: '100%', height: 300 }}>
         <img src="/assets/output_dock.png" alt="Output" className="w-full h-full object-contain" />
