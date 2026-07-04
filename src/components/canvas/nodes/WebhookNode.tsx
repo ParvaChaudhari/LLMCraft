@@ -7,7 +7,7 @@ export default function WebhookNode({ data, selected }: { data: any, selected?: 
       {/* Selection Highlight — covers only the 3×3 diamond footprint */}
       {selected && <DiamondHighlight />}
 
-      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-green-500 border-none rounded-full z-10" style={{ right: 32, top: 48 }} />
+      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-green-500 border-none rounded-full z-10" style={{ right: 64, top: 64 }} />
 
       {/* Image extends upward from the base footprint */}
       <div className="absolute left-0 w-full pointer-events-none" style={{ bottom: -50, height: 256, transform: 'scale(1.15)', transformOrigin: 'bottom center' }}>

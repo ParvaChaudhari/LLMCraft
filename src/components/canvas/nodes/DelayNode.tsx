@@ -18,7 +18,7 @@ export default function DelayNode({ data, selected }: { data: any, selected?: bo
         Truck Stop (Delay)
       </div>
 
-      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-gray-500 border-none rounded-full z-10" style={{ right: 0, top: 32 }} />
+      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-gray-500 border-none rounded-full z-10" style={{ right: 96, top: 80 }} />
     </div>
   );
 }

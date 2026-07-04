@@ -17,18 +17,9 @@
  *      extra images.
  */
 
-export type TileType =
-  | 'road_straight_a'
-  | 'road_straight_b'
-  | 'corner_a_to_b'
-  | 'corner_a_to_neg_b'
-  | 'corner_neg_a_to_b'
-  | 'corner_neg_a_to_neg_b';
-
-export interface TilePlacement {
-  screenX: number;
-  screenY: number;
-  tile: TileType;
+export interface GridPoint {
+  x: number;
+  y: number;
 }
 
 // One iso tile cell dimensions (must match snapGrid in CityCanvas)
@@ -41,10 +32,6 @@ const AXIS_B = { x: -TILE_W / 2, y: TILE_H / 2 };  // (-32, 16) ↙
 
 /**
  * Convert screen-space delta to fractional iso-axis steps.
- * 
- * a * 32 + b * -32 = dx  =>  a - b = dx / 32
- * a * 16 + b * 16  = dy  =>  a + b = dy / 16
- * 2a = dx/32 + dy/16  => a = dx/64 + dy/32
  */
 function screenToIsoSteps(dx: number, dy: number): { a: number; b: number } {
   const a = dx / TILE_W + dy / TILE_H;
@@ -52,106 +39,58 @@ function screenToIsoSteps(dx: number, dy: number): { a: number; b: number } {
   return { a, b };
 }
 
-/** Advance a point by n steps along a given iso axis. */
-function advanceAlongAxis(
-  x: number,
-  y: number,
-  axis: { x: number; y: number },
-  steps: number,
-): { x: number; y: number } {
-  return {
-    x: x + axis.x * steps,
-    y: y + axis.y * steps,
-  };
-}
-
 /**
- * Build the full tile placement list for an edge from (sx,sy) to (tx,ty).
+ * Generate a sequence of grid points from (sx,sy) to (tx,ty).
  */
 export function routeIsometric(
   sx: number,
   sy: number,
   tx: number,
   ty: number,
-): TilePlacement[] {
+): GridPoint[] {
   const dx = tx - sx;
   const dy = ty - sy;
 
-  // Trivial case — same point
   if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return [];
 
   const { a: aRaw, b: bRaw } = screenToIsoSteps(dx, dy);
-
-  // Round to nearest integer tile count
   const aSteps = Math.round(aRaw);
   const bSteps = Math.round(bRaw);
 
-  const tiles: TilePlacement[] = [];
+  const points: GridPoint[] = [];
   let curX = sx;
   let curY = sy;
 
-  // ── Walk Axis A ────────────────────────────────────────────────────────────
   const aSign = Math.sign(aSteps) || 1;
   const aAxis = { x: AXIS_A.x * aSign, y: AXIS_A.y * aSign };
-
-  for (let i = 0; i < Math.abs(aSteps); i++) {
-    const tileCenter = {
-      x: curX + aAxis.x / 2,
-      y: curY + aAxis.y / 2,
-    };
-    tiles.push({
-      screenX: tileCenter.x,
-      screenY: tileCenter.y,
-      tile: 'road_straight_a',
-    });
-    curX += aAxis.x;
-    curY += aAxis.y;
-  }
-
-  // ── Corner tile (only if both segments exist) ──────────────────────────────
-  if (aSteps !== 0 && bSteps !== 0) {
-    const bSign = Math.sign(bSteps) || 1;
-    let cornerTile: TileType;
-
-    if (aSign > 0 && bSign > 0) cornerTile = 'corner_a_to_b';
-    else if (aSign > 0 && bSign < 0) cornerTile = 'corner_a_to_neg_b';
-    else if (aSign < 0 && bSign > 0) cornerTile = 'corner_neg_a_to_b';
-    else cornerTile = 'corner_neg_a_to_neg_b';
-
-    tiles.push({
-      screenX: curX,
-      screenY: curY,
-      tile: cornerTile,
-    });
-  }
-
-  // ── Walk Axis B ────────────────────────────────────────────────────────────
+  
   const bSign = Math.sign(bSteps) || 1;
   const bAxis = { x: AXIS_B.x * bSign, y: AXIS_B.y * bSign };
 
-  for (let i = 0; i < Math.abs(bSteps); i++) {
-    const tileCenter = {
-      x: curX + bAxis.x / 2,
-      y: curY + bAxis.y / 2,
-    };
-    tiles.push({
-      screenX: tileCenter.x,
-      screenY: tileCenter.y,
-      tile: 'road_straight_b',
-    });
-    curX += bAxis.x;
-    curY += bAxis.y;
+  // Walk Axis A
+  for (let i = 0; i <= Math.abs(aSteps); i++) {
+    points.push({ x: curX, y: curY });
+    if (i < Math.abs(aSteps)) {
+      curX += aAxis.x;
+      curY += aAxis.y;
+    }
   }
 
-  return tiles;
+  // Walk Axis B (starting from 1 so we don't duplicate the corner point)
+  for (let i = 1; i <= Math.abs(bSteps); i++) {
+    curX += bAxis.x;
+    curY += bAxis.y;
+    points.push({ x: curX, y: curY });
+  }
+
+  return points;
 }
 
 /**
- * Convert a tile placement list back into an SVG path string for animateMotion.
- * Uses the center points of each tile as waypoints.
+ * Convert a list of grid points into an SVG path string for animateMotion.
  */
-export function tilesToMotionPath(tiles: TilePlacement[]): string {
-  if (tiles.length === 0) return '';
-  const points = tiles.map(t => `${t.screenX},${t.screenY}`);
-  return `M ${points.join(' L ')}`;
+export function tilesToMotionPath(points: GridPoint[]): string {
+  if (points.length === 0) return '';
+  const pStrs = points.map(p => `${p.x},${p.y}`);
+  return `M ${pStrs.join(' L ')}`;
 }

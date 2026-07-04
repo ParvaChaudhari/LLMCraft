@@ -28,6 +28,7 @@ import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
 
 import RoadEdge from './RoadEdge';
+import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
 const nodeTypes = {
@@ -250,6 +251,7 @@ export default function CityCanvas() {
           className="bg-transparent"
         >
           <IsometricBackground />
+          <RoadLayer />
           <Controls />
         </ReactFlow>
       </div>
