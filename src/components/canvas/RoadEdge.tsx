@@ -5,6 +5,8 @@ import { EdgeProps } from '@xyflow/react';
 import { routeIsometric, tilesToMotionPath } from '@/lib/isoRouter';
 import { roadStore } from '@/lib/roadStore';
 
+import TruckAnimator from './TruckAnimator';
+
 export default function RoadEdge({
   id,
   sourceX,
@@ -35,12 +37,9 @@ export default function RoadEdge({
         strokeWidth={32}
       />
 
-      {/* Truck animation */}
-      {data?.isAnimating && motionPath && (
-        // @ts-expect-error: SVG <image> with <animateMotion> child is valid SVG but not in React's typedefs
-        <image href="/assets/truck.png" x={-16} y={-16} width={32} height={32}>
-          <animateMotion dur="2s" repeatCount="1" path={motionPath} rotate="auto" />
-        </image>
+      {/* Custom Truck Animator */}
+      {data?.isAnimating && points.length > 0 && (
+        <TruckAnimator points={points} duration={2000} />
       )}
     </g>
   );
