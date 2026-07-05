@@ -28,6 +28,7 @@ import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
 
 import RoadEdge from './RoadEdge';
+import PipeEdge from './PipeEdge';
 import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
@@ -42,6 +43,7 @@ const nodeTypes = {
 
 const edgeTypes = {
   road: RoadEdge,
+  pipe: PipeEdge,
 };
 
 // Start empty by default, they will either be loaded or manually added via toolbox
@@ -57,9 +59,13 @@ export default function CityCanvas() {
   
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [visualMode, setVisualMode] = useState<'roads' | 'pipes'>('roads');
+  
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
+  const playbackQueueRef = useRef<any[]>([]);
+  const isPlayingRef = useRef(false);
   
   const router = useRouter();
   const supabase = createClient();
@@ -116,6 +122,71 @@ export default function CityCanvas() {
     setIsSaving(false);
     alert('Layout saved successfully!');
   };
+
+  // --- Playback Engine ---
+  useEffect(() => {
+    let timeoutId: any;
+    
+    const processQueue = async () => {
+      if (playbackQueueRef.current.length === 0) {
+        isPlayingRef.current = false;
+        
+        // If queue is empty and SSE is closed/done, we might want to check if all is finished.
+        // For now, if queue is empty, we just wait.
+        return;
+      }
+      
+      isPlayingRef.current = true;
+      const payload = playbackQueueRef.current.shift();
+      const { event: eventName, data: eventData } = payload;
+      
+      if (eventName === 'NODE_STARTED') {
+        setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
+        timeoutId = setTimeout(processQueue, 0); // instantly next
+      } 
+      else if (eventName === 'NODE_FINISHED') {
+        setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
+        if (eventData.type === 'output') {
+          setIsRunning(false);
+        }
+        timeoutId = setTimeout(processQueue, 0);
+      }
+      else if (eventName === 'EDGE_TRAVERSED') {
+        const edgeIdsToAnimate = [eventData.edgeId];
+        
+        // Peek ahead and batch ALL contiguous EDGE_TRAVERSED events!
+        // This ensures parallel branches visually dispatch trucks simultaneously.
+        while (
+          playbackQueueRef.current.length > 0 &&
+          playbackQueueRef.current[0].event === 'EDGE_TRAVERSED'
+        ) {
+          const nextEvent = playbackQueueRef.current.shift();
+          edgeIdsToAnimate.push(nextEvent.data.edgeId);
+        }
+
+        // Trigger animations for all batched edges simultaneously!
+        setEdges(eds => eds.map(e => edgeIdsToAnimate.includes(e.id) ? { ...e, data: { ...e.data, isAnimating: true } } : e));
+        
+        timeoutId = setTimeout(() => {
+          setEdges(eds => eds.map(e => edgeIdsToAnimate.includes(e.id) ? { ...e, data: { ...e.data, isAnimating: false } } : e));
+          processQueue(); // proceed after 2000ms
+        }, 2000);
+      }
+    };
+    
+    // Polling mechanism to kickstart queue if events arrive
+    const pollInterval = setInterval(() => {
+      if (playbackQueueRef.current.length > 0 && !isPlayingRef.current) {
+        processQueue();
+      }
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      clearInterval(pollInterval);
+    };
+  }, []);
+  // -------------------------
 
   const onNodesChange: OnNodesChange = useCallback(
     (changes) => setNodes((nds) => applyNodeChanges(changes, nds)),
@@ -207,30 +278,54 @@ export default function CityCanvas() {
       const eventSource = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
       eventSourceRef.current = eventSource;
 
+      // Manually push the start node events to the Playback Queue for instant visual feedback
+      // so we don't have to wait for the SSE connection to open and receive them!
+      if (visualMode === 'roads') {
+        playbackQueueRef.current.push({ event: 'NODE_STARTED', data: { nodeId: startNode.id } });
+        const outEdges = edges.filter(e => e.source === startNode.id);
+        outEdges.forEach(e => {
+          playbackQueueRef.current.push({ event: 'EDGE_TRAVERSED', data: { edgeId: e.id, source: startNode.id, target: e.target } });
+        });
+        playbackQueueRef.current.push({ event: 'NODE_FINISHED', data: { nodeId: startNode.id, type: 'webhook' } });
+      }
+
       eventSource.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
           const { event: eventName, data: eventData } = payload;
-
-          if (eventName === 'NODE_STARTED') {
-            setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
-          } 
-          else if (eventName === 'NODE_FINISHED') {
-            setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
-            
-            // Check if it's an output node to visually enable the Run button again
-            // But we do NOT close the eventSource, so parallel branches can still finish!
-            const finishedNode = nodes.find(n => n.id === eventData.nodeId);
-            if (finishedNode?.type === 'output') {
-              setIsRunning(false);
-            }
+          
+          // Ignore duplicate events from the backend for the start node,
+          // since we already pushed them to the queue manually!
+          if (eventName === 'NODE_STARTED' || eventName === 'NODE_FINISHED') {
+            if (eventData.nodeId === startNode.id) return;
           }
-          else if (eventName === 'EDGE_TRAVERSED') {
-            setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: true } } : e));
+          if (eventName === 'EDGE_TRAVERSED') {
+            if (eventData.source === startNode.id) return;
+          }
+          
+          if (visualMode === 'roads') {
+            // Push to playback queue
+            playbackQueueRef.current.push(payload);
+          } else {
+            // Instant Pipeline Execution
+            const { event: eventName, data: eventData } = payload;
             
-            setTimeout(() => {
-              setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: false } } : e));
-            }, 2000);
+            if (eventName === 'NODE_STARTED') {
+              setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
+            } 
+            else if (eventName === 'NODE_FINISHED') {
+              setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
+              if (eventData.type === 'output') {
+                setIsRunning(false);
+              }
+            }
+            else if (eventName === 'EDGE_TRAVERSED') {
+              // Very fast instant blip for pipes (500ms)
+              setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: true } } : e));
+              setTimeout(() => {
+                setEdges(eds => eds.map(e => e.id === eventData.edgeId ? { ...e, data: { ...e.data, isAnimating: false } } : e));
+              }, 500);
+            }
           }
         } catch(e) {}
       };
@@ -255,7 +350,7 @@ export default function CityCanvas() {
       <div className="flex-1 h-full w-full relative overflow-hidden bg-[#d2b48c]" onDragOver={onDragOver} onDrop={onDrop}>
         <ReactFlow
           nodes={nodes}
-          edges={edges}
+          edges={edges.map(e => ({ ...e, type: visualMode === 'pipes' ? 'pipe' : 'road' }))}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -272,13 +367,27 @@ export default function CityCanvas() {
           className="bg-transparent"
         >
           <IsometricBackground />
-          <RoadLayer />
+          {visualMode === 'roads' && <RoadLayer />}
           <Controls />
         </ReactFlow>
       </div>
 
       {/* Top right Buttons */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
+        <div className="bg-[#2d2d2d] rounded-lg p-1 flex shadow-lg border border-[#444]">
+          <button
+            onClick={() => setVisualMode('roads')}
+            className={`px-4 py-1 text-sm font-bold rounded-md transition-colors ${visualMode === 'roads' ? 'bg-[#4af626] text-black' : 'text-white hover:bg-[#333]'}`}
+          >
+            City Mode
+          </button>
+          <button
+            onClick={() => setVisualMode('pipes')}
+            className={`px-4 py-1 text-sm font-bold rounded-md transition-colors ${visualMode === 'pipes' ? 'bg-[#06b6d4] text-white' : 'text-white hover:bg-[#333]'}`}
+          >
+            Pipeline
+          </button>
+        </div>
         <button
           onClick={handleSave}
           disabled={isSaving}

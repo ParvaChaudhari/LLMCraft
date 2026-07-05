@@ -86,12 +86,12 @@ const executeNode = async (job: Job) => {
     }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
-    await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, output: newContext.lastOutput });
+    await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
     return; // End of line
   }
 
   // Broadcast completion of current node
-  await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, output: newContext.lastOutput });
+  await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
 
   // 2. Find next nodes based on edges
   const outgoingEdges = edges.filter((e: any) => e.source === nodeId);
@@ -146,7 +146,7 @@ if (global.__worker__) {
 }
 
 console.log('[Queue] Starting background worker...');
-global.__worker__ = new Worker('workflow-queue', executeNode, { connection });
+global.__worker__ = new Worker('workflow-queue', executeNode, { connection, concurrency: 100 });
 
 global.__worker__.on('completed', (job) => {
   // console.log(`[Queue] Job ${job.id} completed successfully`);
