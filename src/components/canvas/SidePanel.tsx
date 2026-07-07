@@ -1,5 +1,51 @@
 import { useState, useEffect } from 'react';
 
+const JsonNode = ({ keyName, value, path, onInsert }: any) => {
+  const [expanded, setExpanded] = useState(true);
+  const isObject = value !== null && typeof value === 'object';
+  
+  if (isObject) {
+    return (
+      <div className="ml-2 border-l-2 border-[#333] pl-2 my-1 font-mono text-sm">
+        <div 
+          className="cursor-pointer hover:bg-[#333] inline-block px-1 text-blue-400 font-bold"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? '▼' : '▶'} {keyName}
+        </div>
+        {expanded && (
+          <div>
+            {Object.entries(value).map(([k, v]) => (
+              <JsonNode 
+                key={k} 
+                keyName={k} 
+                value={v} 
+                path={path ? `${path}.${k}` : k} 
+                onInsert={onInsert} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Primitive value
+  return (
+    <div className="ml-4 my-1 flex items-start group font-mono text-sm relative pr-10">
+      <span className="text-orange-400 font-bold mr-2 whitespace-nowrap">{keyName}:</span>
+      <span className="text-green-300 break-all">{String(value)}</span>
+      <button 
+        onClick={() => onInsert(path)}
+        className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 rounded-sm hover:bg-[#3ade1d] transition-opacity"
+        title="Insert Variable"
+      >
+        +
+      </button>
+    </div>
+  );
+};
+
 const toolAssets: Record<string, string> = {
   webhook: 'webhook_tower.png',
   httpRequest: 'http_request.png',
@@ -44,6 +90,20 @@ export default function SidePanel({
     updateNodeData(selectedNode.id, { [key]: value });
   };
 
+  const handleInsertVariable = (path: string) => {
+    const templateTag = `{{${path}}}`;
+    if (selectedNode.type === 'geminiFactory') {
+      const currentPrompt = selectedNode.data?.prompt || '';
+      handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
+    } else if (selectedNode.type === 'httpRequest') {
+      const currentUrl = selectedNode.data?.url || '';
+      handleChange('url', currentUrl + (currentUrl ? ' ' : '') + templateTag);
+    } else if (selectedNode.type === 'conditional') {
+      const currentMatch = selectedNode.data?.matchText || '';
+      handleChange('matchText', currentMatch + (currentMatch ? ' ' : '') + templateTag);
+    }
+  };
+
   const handleCreateCredential = async () => {
     if (!newCredName || !newCredKey) return;
     setIsSavingCred(true);
@@ -79,6 +139,54 @@ export default function SidePanel({
   // Calculate inputs for the 'Input' tab
   const incomingEdges = edges.filter(e => e.target === selectedNode.id);
   const incomingNodes = incomingEdges.map(e => nodes.find(n => n.id === e.source)).filter(Boolean);
+
+  const renderInputSource = (node: any) => {
+    let outputData = node.data?.output;
+    let parsedJson = null;
+
+    if (outputData) {
+      try {
+        parsedJson = JSON.parse(outputData);
+      } catch (e) {
+        // Not JSON
+      }
+    }
+
+    if (parsedJson && typeof parsedJson === 'object') {
+      return (
+        <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
+          {Object.entries(parsedJson).map(([k, v]) => (
+            <JsonNode 
+              key={k} 
+              keyName={k} 
+              value={v} 
+              path={`${node.id}.${k}`} 
+              onInsert={handleInsertVariable} 
+            />
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex-1 flex flex-col relative group">
+        <textarea 
+          readOnly 
+          className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
+          value={outputData || 'No output generated yet.'}
+        />
+        {outputData && (
+           <button 
+             onClick={() => handleInsertVariable(node.id)}
+             className="absolute top-0 right-4 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 py-1 rounded-sm hover:bg-[#3ade1d] transition-opacity"
+             title="Insert Variable"
+           >
+             + Insert String
+           </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-8 pointer-events-auto">
@@ -147,15 +255,13 @@ export default function SidePanel({
                     No incoming connections.
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4 h-full flex flex-col">
                     {incomingNodes.map((node: any) => (
-                      <div key={node.id} className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d]">
-                        <div className="text-[#4af626] font-bold text-xs uppercase mb-2">SOURCE: {node.type}</div>
-                        <textarea 
-                          readOnly 
-                          className="w-full h-32 bg-transparent text-white font-mono text-sm resize-none outline-none"
-                          value={node.data?.output || 'No output generated yet.'}
-                        />
+                      <div key={node.id} className="bg-[#1a1a1a] p-4 pr-0 border-[3px] border-[#2d2d2d] flex-1 flex flex-col">
+                        <div className="text-[#4af626] font-bold text-xs uppercase mb-2 mr-4 flex justify-between">
+                          <span>SOURCE: {node.type}</span>
+                        </div>
+                        {renderInputSource(node)}
                       </div>
                     ))}
                   </div>
@@ -323,15 +429,15 @@ export default function SidePanel({
                 <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Logs</h3>
               </div>
               <div className="flex-1 p-4 overflow-y-auto">
-                <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 flex flex-col">
-                  <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 flex justify-between">
+                <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col">
+                  <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between">
                     <span>SYSTEM OUTPUT</span>
                     <span className="text-gray-500">READY</span>
                   </div>
                   {data.output ? (
                     <textarea 
                       readOnly 
-                      className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none"
+                      className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
                       value={data.output}
                     />
                   ) : (

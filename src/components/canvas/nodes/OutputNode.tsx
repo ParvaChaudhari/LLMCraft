@@ -1,9 +1,20 @@
-import { Handle, Position } from '@xyflow/react';
+import { Handle, Position, useReactFlow } from '@xyflow/react';
 import DiamondHighlight from './DiamondHighlight';
 
-export default function OutputNode({ data, selected }: { data: any, selected?: boolean }) {
+export default function OutputNode({ id, data, selected }: { id: string, data: any, selected?: boolean }) {
+  const { deleteElements } = useReactFlow();
   return (
     <div className="relative group" style={{ width: 256, height: 128 }}>
+      <button 
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteElements({ nodes: [{ id }] });
+        }}
+        className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white font-bold text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-red-500 border border-red-800 flex items-center justify-center pointer-events-auto"
+        title="Delete Node"
+      >
+        X
+      </button>
       {selected && <DiamondHighlight cols={4} rows={4} style={{ left: 32, top: -32 }} />}
 
       <Handle type="target" position={Position.Left} className="w-2 h-2 bg-orange-500 border-none rounded-full z-10" style={{ left: 64, top: 32 }} />

@@ -58,3 +58,26 @@ img {
 .animate-pipe-flow {
   animation: pipeFlow 0.5s linear infinite;
 }
+
+/* Custom Minimal Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}

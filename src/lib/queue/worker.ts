@@ -21,13 +21,44 @@ const broadcastEvent = async (workflowId: string, event: string, data: any) => {
   }
 };
 
+// Helper to resolve dot-notation paths from context
+const resolvePath = (context: any, path: string) => {
+  const parts = path.split('.');
+  const baseKey = parts[0]; // e.g., 'webhook_1' or 'lastOutput'
+  
+  let baseValue = context[baseKey];
+  if (baseValue === undefined) return undefined;
+  
+  // If there are no nested parts, just return the base value directly
+  if (parts.length === 1) return baseValue;
+  
+  // If there are nested parts, attempt to parse the base value as JSON
+  try {
+    const parsedObj = typeof baseValue === 'string' ? JSON.parse(baseValue) : baseValue;
+    let current = parsedObj;
+    for (let i = 1; i < parts.length; i++) {
+      if (current === null || current === undefined) return undefined;
+      current = current[parts[i]];
+    }
+    
+    // If the final result is an object/array, stringify it so it can be injected cleanly
+    if (typeof current === 'object' && current !== null) {
+      return JSON.stringify(current);
+    }
+    return current;
+  } catch (e) {
+    // If it's not valid JSON, we cannot resolve a nested path
+    return undefined;
+  }
+};
+
 // Helper for template variable interpolation
 const replaceVariables = (text: string, context: any) => {
   if (!text || typeof text !== 'string') return text;
   return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
     const trimmedKey = key.trim();
-    // Allow reading from node IDs if stored in context, or flat keys like lastOutput
-    return context[trimmedKey] !== undefined ? context[trimmedKey] : match;
+    const resolvedValue = resolvePath(context, trimmedKey);
+    return resolvedValue !== undefined ? String(resolvedValue) : match;
   });
 };
 
