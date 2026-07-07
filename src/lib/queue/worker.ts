@@ -1,6 +1,8 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createClient } from '@/lib/supabase/client';
+import { decrypt } from '@/lib/crypto';
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -46,7 +48,36 @@ const executeNode = async (job: Job) => {
 
   // 1. Run specific node logic
   if (currentNode.type === 'geminiFactory') {
-    const apiKey = process.env.GEMINI_API_KEY;
+    let apiKey = process.env.GEMINI_API_KEY;
+    const credentialId = currentNode.data?.credentialId;
+
+    if (credentialId) {
+      console.log(`[Queue] Fetching credential ${credentialId} from database...`);
+      const supabase = createClient();
+      const { data: credData, error } = await supabase
+        .from('credentials')
+        .select('encrypted_data')
+        .eq('id', credentialId)
+        .single();
+      
+      if (error || !credData) {
+        console.error(`[Queue] Failed to load credential:`, error?.message);
+        newContext.lastOutput = `Error: Failed to load credential (${error?.message || 'Not found'})`;
+        await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
+        return;
+      }
+
+      try {
+        apiKey = decrypt(credData.encrypted_data);
+        console.log(`[Queue] Successfully decrypted credential for Gemini.`);
+      } catch (decErr: any) {
+        console.error(`[Queue] Decryption failed:`, decErr.message);
+        newContext.lastOutput = `Error: Failed to decrypt credential`;
+        await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
+        return;
+      }
+    }
+
     if (apiKey) {
       try {
         const genAI = new GoogleGenerativeAI(apiKey);
@@ -68,7 +99,7 @@ const executeNode = async (job: Job) => {
       }
     } else {
       console.log(`[Queue] No Gemini API key found.`);
-      newContext.lastOutput = "Error: No Gemini API Key";
+      newContext.lastOutput = "Error: No Gemini API Key or Credential selected.";
     }
   } else if (currentNode.type === 'httpRequest') {
     const url = replaceVariables(currentNode.data?.url || "https://jsonplaceholder.typicode.com/posts/1", newContext);

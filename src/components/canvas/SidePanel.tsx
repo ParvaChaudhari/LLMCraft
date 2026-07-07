@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const toolAssets: Record<string, string> = {
   webhook: 'webhook_tower.png',
@@ -22,10 +22,55 @@ export default function SidePanel({
   nodes?: any[];
   edges?: any[];
 }) {
+  const [credentials, setCredentials] = useState<any[]>([]);
+  const [showNewCredForm, setShowNewCredForm] = useState(false);
+  const [newCredName, setNewCredName] = useState('');
+  const [newCredKey, setNewCredKey] = useState('');
+  const [isSavingCred, setIsSavingCred] = useState(false);
+
+  // Fetch credentials when a node that needs them is selected
+  useEffect(() => {
+    if (selectedNode?.type === 'geminiFactory') {
+      fetch(`/api/credentials?type=gemini`)
+        .then(res => res.json())
+        .then(data => setCredentials(Array.isArray(data) ? data : []))
+        .catch(console.error);
+    }
+  }, [selectedNode?.type]);
+
   if (!selectedNode) return null;
 
   const handleChange = (key: string, value: any) => {
     updateNodeData(selectedNode.id, { [key]: value });
+  };
+
+  const handleCreateCredential = async () => {
+    if (!newCredName || !newCredKey) return;
+    setIsSavingCred(true);
+    try {
+      // The node type dictates the credential type
+      let credType = '';
+      if (selectedNode.type === 'geminiFactory') credType = 'gemini';
+      
+      const res = await fetch('/api/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newCredName, type: credType, apiKey: newCredKey })
+      });
+      const newCred = await res.json();
+      
+      if (newCred.id) {
+        setCredentials(prev => [newCred, ...prev]);
+        handleChange('credentialId', newCred.id); // Auto select it
+        setShowNewCredForm(false);
+        setNewCredName('');
+        setNewCredKey('');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSavingCred(false);
+    }
   };
 
   const data = selectedNode.data || {};
@@ -127,6 +172,60 @@ export default function SidePanel({
                 {selectedNode.type === 'geminiFactory' && (
                   <>
                     <div>
+                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
+                      <div className="flex gap-2">
+                        <select
+                          value={data.credentialId || ''}
+                          onChange={(e) => handleChange('credentialId', e.target.value)}
+                          className="flex-1 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                        >
+                          <option value="">-- Select Credential --</option>
+                          {credentials.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                        <button 
+                          onClick={() => setShowNewCredForm(!showNewCredForm)}
+                          className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-[#4af626] border-[3px] border-[#2d2d2d] px-4 font-bold text-xl transition-colors"
+                        >
+                          {showNewCredForm ? '-' : '+'}
+                        </button>
+                      </div>
+                      
+                      {showNewCredForm && (
+                        <div className="mt-2 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] space-y-4">
+                          <h4 className="text-[#c4b4a4] font-bold text-xs uppercase tracking-widest border-b border-[#333] pb-2">Create New Credential</h4>
+                          <div>
+                            <label className="block text-xs font-bold mb-1 text-gray-400">Credential Name</label>
+                            <input
+                              type="text"
+                              value={newCredName}
+                              onChange={(e) => setNewCredName(e.target.value)}
+                              placeholder="e.g. My Personal Gemini Key"
+                              className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold mb-1 text-gray-400">API Key</label>
+                            <input
+                              type="password"
+                              value={newCredKey}
+                              onChange={(e) => setNewCredKey(e.target.value)}
+                              placeholder="AIzaSy..."
+                              className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                            />
+                          </div>
+                          <button
+                            onClick={handleCreateCredential}
+                            disabled={!newCredName || !newCredKey || isSavingCred}
+                            className="w-full bg-[#4af626] hover:bg-[#3ade1d] text-black font-bold py-2 px-4 uppercase tracking-wider disabled:opacity-50"
+                          >
+                            {isSavingCred ? 'Saving...' : 'Save & Select'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div>
                       <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">AI Model Version</label>
                       <select
                         value={data.model || 'gemini-3.1-flash-lite'}
@@ -143,7 +242,7 @@ export default function SidePanel({
                       <textarea
                         value={data.prompt || ''}
                         onChange={(e) => handleChange('prompt', e.target.value)}
-                        className="w-full h-48 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                        className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
                         placeholder="Summarize this: {{lastOutput}}"
                       />
                     </div>
