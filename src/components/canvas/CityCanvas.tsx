@@ -411,6 +411,8 @@ export default function CityCanvas() {
         selectedNode={selectedNode} 
         onClose={() => setSelectedNode(null)} 
         updateNodeData={updateNodeData}
+        nodes={nodes}
+        edges={edges}
       />
     </div>
   );

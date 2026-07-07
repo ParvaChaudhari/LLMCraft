@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 
 const toolAssets: Record<string, string> = {
@@ -12,22 +11,47 @@ const toolAssets: Record<string, string> = {
 
 export default function Toolbox() {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const onDragEnd = () => {
+    setIsExpanded(false);
+    setSelectedTool(null);
+  };
+
+  if (!isExpanded) {
+    return (
+      <div className="absolute top-4 left-4 z-10">
+        <button 
+          onClick={() => setIsExpanded(true)}
+          className="bg-[#d8c8b8] text-[#2d2d2d] font-bold text-2xl w-12 h-12 flex items-center justify-center border-[3px] border-[#2d2d2d] hover:bg-[#c4b29f] transition-colors"
+          style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}
+        >
+          +
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute top-4 left-4 z-10 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d]" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
-      <h3 className="text-lg font-bold text-[#2d2d2d] mb-4 border-b-2 border-[#2d2d2d] pb-2 uppercase tracking-widest">Projects</h3>
+      <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
+        <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Projects</h3>
+        <button onClick={() => setIsExpanded(false)} className="text-[#2d2d2d] hover:text-black font-bold text-xl px-2">_</button>
+      </div>
       <div className="space-y-3">
         
         <div 
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'webhook')} 
-          onClick={() => setSelectedTool('webhook')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('webhook')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-green-400">[+] Radio Tower</div>
@@ -38,7 +62,9 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'httpRequest')} 
-          onClick={() => setSelectedTool('httpRequest')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('httpRequest')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-teal-400">[*] Data Center</div>
@@ -49,7 +75,9 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'geminiFactory')} 
-          onClick={() => setSelectedTool('geminiFactory')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('geminiFactory')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-blue-400">[~] AI Factory</div>
@@ -60,7 +88,9 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'conditional')} 
-          onClick={() => setSelectedTool('conditional')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('conditional')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-yellow-400">[?] Toll Booth</div>
@@ -71,7 +101,9 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'delay')} 
-          onClick={() => setSelectedTool('delay')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('delay')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-gray-300">[-] Truck Stop</div>
@@ -82,7 +114,9 @@ export default function Toolbox() {
           className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
           style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
           onDragStart={(event) => onDragStart(event, 'output')} 
-          onClick={() => setSelectedTool('output')}
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('output')}
+          onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
           <div className="font-bold text-orange-400">[=] Delivery Dock</div>
@@ -93,10 +127,9 @@ export default function Toolbox() {
 
       {/* Asset Preview Panel */}
       {selectedTool && (
-        <div className="absolute top-0 left-[300px] z-20 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d]" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
+        <div className="absolute top-0 left-[300px] z-20 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d] pointer-events-none" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
           <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
             <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Asset Preview</h3>
-            <button onClick={() => setSelectedTool(null)} className="text-red-500 hover:text-red-700 font-bold text-xl px-2">X</button>
           </div>
           <div className="bg-[#2d2d2d] p-4 flex items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
             {toolAssets[selectedTool] && (
@@ -108,7 +141,6 @@ export default function Toolbox() {
               />
             )}
           </div>
-          <p className="mt-3 text-sm text-[#2d2d2d] font-bold text-center">Drag from the toolbox to place</p>
         </div>
       )}
     </div>
