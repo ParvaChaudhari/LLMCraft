@@ -96,8 +96,8 @@ export default function SidePanel({
       const currentPrompt = selectedNode.data?.prompt || '';
       handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'httpRequest') {
-      const currentUrl = selectedNode.data?.url || '';
-      handleChange('url', currentUrl + (currentUrl ? ' ' : '') + templateTag);
+      const currentBody = selectedNode.data?.body || '';
+      handleChange('body', currentBody + (currentBody ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'conditional') {
       const currentMatch = selectedNode.data?.matchText || '';
       handleChange('matchText', currentMatch + (currentMatch ? ' ' : '') + templateTag);
@@ -357,25 +357,49 @@ export default function SidePanel({
 
                 {selectedNode.type === 'httpRequest' && (
                   <>
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Method</label>
-                      <select
-                        value={data.method || 'GET'}
-                        onChange={(e) => handleChange('method', e.target.value)}
-                        className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
-                      >
-                        <option value="GET">GET</option>
-                        <option value="POST">POST</option>
-                      </select>
+                    <div className="flex gap-4">
+                      <div className="w-1/4">
+                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Method</label>
+                        <select
+                          value={data.method || 'GET'}
+                          onChange={(e) => handleChange('method', e.target.value)}
+                          className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                        >
+                          <option value="GET">GET</option>
+                          <option value="POST">POST</option>
+                          <option value="PUT">PUT</option>
+                          <option value="DELETE">DELETE</option>
+                        </select>
+                      </div>
+                      <div className="w-3/4">
+                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Target URL</label>
+                        <input
+                          type="text"
+                          value={data.url || ''}
+                          onChange={(e) => handleChange('url', e.target.value)}
+                          className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                          placeholder="https://api.example.com/data"
+                        />
+                      </div>
                     </div>
+                    
                     <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Target URL</label>
-                      <input
-                        type="text"
-                        value={data.url || ''}
-                        onChange={(e) => handleChange('url', e.target.value)}
-                        className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
-                        placeholder="https://api.example.com/data"
+                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Headers (JSON)</label>
+                      <textarea
+                        value={data.headers || ''}
+                        onChange={(e) => handleChange('headers', e.target.value)}
+                        className="w-full h-20 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                        placeholder='{"Content-Type": "application/json"}'
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Body (JSON)</label>
+                      <textarea
+                        value={data.body || ''}
+                        onChange={(e) => handleChange('body', e.target.value)}
+                        className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                        placeholder='{"data": "{{previous_node.value}}"}'
                       />
                     </div>
                   </>

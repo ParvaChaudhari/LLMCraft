@@ -136,9 +136,24 @@ const executeNode = async (job: Job) => {
     const url = replaceVariables(currentNode.data?.url || "https://jsonplaceholder.typicode.com/posts/1", newContext);
     const method = currentNode.data?.method || "GET";
     
+    const options: RequestInit = { method };
+
+    if (currentNode.data?.headers) {
+      try {
+        const parsedHeaders = JSON.parse(replaceVariables(currentNode.data.headers, newContext));
+        options.headers = parsedHeaders;
+      } catch (err: any) {
+        console.error(`[Queue] Failed to parse headers:`, err.message);
+      }
+    }
+
+    if (currentNode.data?.body && ['POST', 'PUT', 'DELETE'].includes(method)) {
+      options.body = replaceVariables(currentNode.data.body, newContext);
+    }
+    
     console.log(`[Queue] Making real HTTP ${method} request to ${url}...`);
     try {
-      const res = await fetch(url, { method });
+      const res = await fetch(url, options);
       const data = await res.text();
       newContext.lastOutput = data;
       newContext[nodeId] = data;
