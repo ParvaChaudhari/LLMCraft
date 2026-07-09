@@ -34,7 +34,12 @@ const resolvePath = (context: any, path: string) => {
   
   // If there are nested parts, attempt to parse the base value as JSON
   try {
-    const parsedObj = typeof baseValue === 'string' ? JSON.parse(baseValue) : baseValue;
+    let raw = baseValue;
+    if (typeof raw === 'string') {
+      const match = raw.match(/```(?:json)?\n([\s\S]*?)\n```/);
+      if (match) raw = match[1].trim();
+    }
+    const parsedObj = typeof raw === 'string' ? JSON.parse(raw) : raw;
     let current = parsedObj;
     for (let i = 1; i < parts.length; i++) {
       if (current === null || current === undefined) return undefined;
@@ -90,6 +95,24 @@ const executeNode = async (job: Job) => {
   await broadcastEvent(workflowId, 'NODE_STARTED', { nodeId, type: currentNode.type });
   
   let newContext = { ...context };
+
+  // Limit Node: Toll Booth Counter Check
+  if (currentNode.type === 'limit') {
+    newContext.limitCounters = newContext.limitCounters || {};
+    const currentCount = newContext.limitCounters[nodeId] || 0;
+    const maxItems = currentNode.data?.maxItems || 1;
+    
+    if (currentCount >= maxItems) {
+      console.log(`[Queue] Limit reached for node ${nodeId} (${currentCount}/${maxItems}). Stopping path.`);
+      newContext.lastOutput = `Limit Reached (${maxItems} items max)`;
+      await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput, isLastNode: true });
+      return; // End execution of this branch
+    }
+    
+    newContext.limitCounters[nodeId] = currentCount + 1;
+    newContext.lastOutput = `Passed Toll Booth (${currentCount + 1}/${maxItems})`;
+    console.log(`[Queue] Passing Limit node ${nodeId}: ${currentCount + 1}/${maxItems}`);
+  }
 
   // 1. Run specific node logic
   if (currentNode.type === 'geminiFactory') {
@@ -263,27 +286,65 @@ const executeNode = async (job: Job) => {
     return; // End of line
   }
 
-  // Broadcast completion of current node
-  await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
-
   // 2. Find next nodes based on edges
   const outgoingEdges = edges.filter((e: any) => e.source === nodeId);
+  const validEdges: any[] = [];
   
-  for (const edge of outgoingEdges) {
-    let nextNodeId = edge.target;
+  let expectedHandle: string | null = null;
+  if (currentNode.type === 'conditional') {
+    const lhsRaw = currentNode.data?.conditionLhs || '{{lastOutput}}';
+    const rhsRaw = currentNode.data?.conditionRhs || 'error';
+    const op = currentNode.data?.conditionOperator || 'contains';
     
-    // For conditional branching, we pick the right handle
-    if (currentNode.type === 'conditional') {
-      const matchText = (currentNode.data?.matchText || "error").toLowerCase();
-      // True path if NOT matched, False path if matched
-      const condition = newContext.lastOutput?.toLowerCase().includes(matchText) ? false : true;
-      const expectedHandle = condition ? 'true' : 'false';
-      if (edge.sourceHandle !== expectedHandle) {
-        continue; // Skip this edge path
-      }
-      console.log(`[Queue] Conditional evaluated to ${condition}, taking path: ${expectedHandle}`);
+    const lhs = replaceVariables(lhsRaw, newContext);
+    const rhs = replaceVariables(rhsRaw, newContext);
+    
+    let condition = false;
+    const lhsStr = String(lhs).toLowerCase();
+    const rhsStr = String(rhs).toLowerCase();
+    
+    switch (op) {
+      case 'contains':
+        condition = lhsStr.includes(rhsStr);
+        break;
+      case 'is_equal_to':
+        condition = lhsStr === rhsStr;
+        break;
+      case 'is_not_equal_to':
+        condition = lhsStr !== rhsStr;
+        break;
+      case 'greater_than':
+        condition = parseFloat(lhsStr) > parseFloat(rhsStr);
+        break;
+      case 'less_than':
+        condition = parseFloat(lhsStr) < parseFloat(rhsStr);
+        break;
+      default:
+        condition = lhsStr.includes(rhsStr);
     }
+    
+    expectedHandle = condition ? 'true' : 'false';
+    console.log(`[Queue] Conditional '${lhsRaw} ${op} ${rhsRaw}' evaluated to ${condition}, taking path: ${expectedHandle}`);
+  }
 
+  for (const edge of outgoingEdges) {
+    if (currentNode.type === 'conditional' && edge.sourceHandle !== expectedHandle) {
+      continue;
+    }
+    validEdges.push(edge);
+  }
+
+  // Broadcast completion of current node
+  newContext[nodeId] = newContext.lastOutput;
+  await broadcastEvent(workflowId, 'NODE_FINISHED', { 
+    nodeId, 
+    type: currentNode.type, 
+    output: newContext.lastOutput,
+    isLastNode: validEdges.length === 0
+  });
+  
+  for (const edge of validEdges) {
+    let nextNodeId = edge.target;
     const nextNode = nodes.find((n: any) => n.id === nextNodeId);
     let delay = 0;
     

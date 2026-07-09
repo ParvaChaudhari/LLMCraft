@@ -55,7 +55,8 @@ const toolAssets: Record<string, string> = {
   geminiFactory: 'gemini_factory.png',
   chatgptFactory: 'chatgpt_factory.png',
   claudeFactory: 'claude_factory.png',
-  conditional: 'conditional_gate.png',
+  conditional: 'conditional_road.png',
+  limit: 'limit_toll.png',
   delay: 'delay_stop.png',
   output: 'output_dock.png'
 };
@@ -184,8 +185,8 @@ export default function SidePanel({
       const currentBody = selectedNode.data?.body || '';
       handleChange('body', currentBody + (currentBody ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'conditional') {
-      const currentMatch = selectedNode.data?.matchText || '';
-      handleChange('matchText', currentMatch + (currentMatch ? ' ' : '') + templateTag);
+      const currentMatch = selectedNode.data?.conditionLhs || '';
+      handleChange('conditionLhs', currentMatch + (currentMatch ? ' ' : '') + templateTag);
     }
   };
 
@@ -232,7 +233,10 @@ export default function SidePanel({
 
     if (outputData) {
       try {
-        parsedJson = JSON.parse(outputData);
+        let cleanData = outputData;
+        const match = cleanData.match(/```(?:json)?\n([\s\S]*?)\n```/);
+        if (match) cleanData = match[1].trim();
+        parsedJson = JSON.parse(cleanData);
       } catch (e) {
         // Not JSON
       }
@@ -545,15 +549,70 @@ export default function SidePanel({
                     )}
 
                     {selectedNode.type === 'conditional' && (
-                      <div>
-                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Route to False If Output Contains:</label>
-                        <input
-                          type="text"
-                          value={data.matchText || 'error'}
-                          onChange={(e) => handleChange('matchText', e.target.value)}
-                          className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
-                          placeholder="error"
-                        />
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Condition Variable</label>
+                          <input
+                            type="text"
+                            value={data.conditionLhs ?? '{{lastOutput}}'}
+                            onChange={(e) => handleChange('conditionLhs', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="{{lastOutput}}"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Operator</label>
+                          <select
+                            value={data.conditionOperator || 'contains'}
+                            onChange={(e) => handleChange('conditionOperator', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                          >
+                            <option value="contains">Contains</option>
+                            <option value="is_equal_to">Is Equal To</option>
+                            <option value="is_not_equal_to">Is Not Equal To</option>
+                            <option value="greater_than">Is Greater Than</option>
+                            <option value="less_than">Is Less Than</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Compare Value</label>
+                          <input
+                            type="text"
+                            value={data.conditionRhs ?? 'error'}
+                            onChange={(e) => handleChange('conditionRhs', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="error"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {selectedNode.type === 'limit' && (
+                      <div className="space-y-4">
+                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
+                          Toll Booth controls how many times a loop can execute before stopping.
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Max Items / Passes</label>
+                          <input
+                            type="number"
+                            value={data.maxItems || 1}
+                            onChange={(e) => handleChange('maxItems', parseInt(e.target.value))}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="1"
+                            min="1"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Keep</label>
+                          <select
+                            disabled
+                            value="first_items"
+                            className="w-full bg-[#1a1a1a] text-gray-500 p-4 border-[3px] border-[#2d2d2d] outline-none font-bold opacity-50 cursor-not-allowed"
+                          >
+                            <option value="first_items">First Items</option>
+                          </select>
+                        </div>
                       </div>
                     )}
                     

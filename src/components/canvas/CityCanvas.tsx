@@ -25,6 +25,7 @@ import ClaudeFactoryNode from './nodes/ClaudeFactoryNode';
 import OutputNode from './nodes/OutputNode';
 import HttpRequestNode from './nodes/HttpRequestNode';
 import ConditionalNode from './nodes/ConditionalNode';
+import LimitNode from './nodes/LimitNode';
 import DelayNode from './nodes/DelayNode';
 import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
@@ -43,6 +44,7 @@ const nodeTypes = {
   output: OutputNode,
   httpRequest: HttpRequestNode,
   conditional: ConditionalNode,
+  limit: LimitNode,
   delay: DelayNode,
 };
 
@@ -152,7 +154,7 @@ export default function CityCanvas() {
       } 
       else if (eventName === 'NODE_FINISHED') {
         setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
-        if (eventData.type === 'output') {
+        if (eventData.type === 'output' || eventData.isLastNode) {
           setIsRunning(false);
         }
         timeoutId = setTimeout(processQueue, 0);

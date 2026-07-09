@@ -6,7 +6,8 @@ const toolAssets: Record<string, string> = {
   geminiFactory: 'gemini_factory.png',
   chatgptFactory: 'chatgpt_factory.png',
   claudeFactory: 'claude_factory.png',
-  conditional: 'conditional_gate.png',
+  conditional: 'conditional_road.png',
+  limit: 'limit_toll.png',
   delay: 'delay_stop.png',
   output: 'output_dock.png'
 };
@@ -154,8 +155,21 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
           onMouseLeave={() => setSelectedTool(null)}
           draggable
         >
-          <div className="font-bold text-yellow-400">[?] Toll Booth</div>
+          <div className="font-bold text-yellow-400">[?] Filter Gate</div>
           <div className="text-xs text-gray-400 mt-1">If/Else Logic Gate</div>
+        </div>
+
+        <div 
+          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+          onDragStart={(event) => onDragStart(event, 'limit')} 
+          onDragEnd={onDragEnd}
+          onMouseEnter={() => setSelectedTool('limit')}
+          onMouseLeave={() => setSelectedTool(null)}
+          draggable
+        >
+          <div className="font-bold text-red-400">[!] Toll Booth</div>
+          <div className="text-xs text-gray-400 mt-1">Execution Limit Counter</div>
         </div>
 
         <div 
