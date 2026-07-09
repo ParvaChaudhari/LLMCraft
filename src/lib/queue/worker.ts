@@ -62,6 +62,20 @@ const replaceVariables = (text: string, context: any) => {
   });
 };
 
+// Helper to fetch and decrypt API keys
+const fetchApiKey = async (credentialId: string): Promise<string | null> => {
+  if (!credentialId) return null;
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase.from('credentials').select('encrypted_data').eq('id', credentialId).single();
+    if (error || !data) return null;
+    return decrypt(data.encrypted_data);
+  } catch (e) {
+    console.error('[Queue] Error decrypting key:', e);
+    return null;
+  }
+};
+
 // The traversal logic for a single node
 const executeNode = async (job: Job) => {
   const { workflowId, nodeId, nodes, edges, context } = job.data;
@@ -132,6 +146,88 @@ const executeNode = async (job: Job) => {
       console.log(`[Queue] No Gemini API key found.`);
       newContext.lastOutput = "Error: No Gemini API Key or Credential selected.";
     }
+  } else if (currentNode.type === 'chatgptFactory') {
+    const credentialId = currentNode.data?.credentialId;
+    const apiKey = await fetchApiKey(credentialId);
+    
+    if (!apiKey) {
+      newContext.lastOutput = "Error: Invalid or missing OpenAI API Key.";
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      const rawPrompt = currentNode.data?.prompt || "Tell me a joke.";
+      const prompt = replaceVariables(rawPrompt, newContext);
+      const model = currentNode.data?.model || "gpt-4o";
+      
+      console.log(`[Queue] Calling OpenAI (${model}) with prompt: ${prompt}`);
+      
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'OpenAI API Error');
+        
+        newContext.lastOutput = data.choices?.[0]?.message?.content || "No output returned.";
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] ChatGPT Output: ${newContext.lastOutput.trim()}`);
+      } catch (err: any) {
+        console.error(`[Queue] ChatGPT Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
+    
+  } else if (currentNode.type === 'claudeFactory') {
+    const credentialId = currentNode.data?.credentialId;
+    const apiKey = await fetchApiKey(credentialId);
+    
+    if (!apiKey) {
+      newContext.lastOutput = "Error: Invalid or missing Anthropic API Key.";
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      const rawPrompt = currentNode.data?.prompt || "Write a haiku.";
+      const prompt = replaceVariables(rawPrompt, newContext);
+      const model = currentNode.data?.model || "claude-3-5-sonnet-20240620";
+      
+      console.log(`[Queue] Calling Claude (${model}) with prompt: ${prompt}`);
+      
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: model,
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }]
+          })
+        });
+        
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error?.message || 'Anthropic API Error');
+        
+        newContext.lastOutput = data.content?.[0]?.text || "No output returned.";
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Claude Output: ${newContext.lastOutput.trim()}`);
+      } catch (err: any) {
+        console.error(`[Queue] Claude Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
+    
   } else if (currentNode.type === 'httpRequest') {
     const url = replaceVariables(currentNode.data?.url || "https://jsonplaceholder.typicode.com/posts/1", newContext);
     const method = currentNode.data?.method || "GET";

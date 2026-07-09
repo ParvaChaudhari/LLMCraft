@@ -20,12 +20,15 @@ import '@xyflow/react/dist/style.css';
 
 import WebhookNode from './nodes/WebhookNode';
 import GeminiFactoryNode from './nodes/GeminiFactoryNode';
+import ChatGPTFactoryNode from './nodes/ChatGPTFactoryNode';
+import ClaudeFactoryNode from './nodes/ClaudeFactoryNode';
 import OutputNode from './nodes/OutputNode';
 import HttpRequestNode from './nodes/HttpRequestNode';
 import ConditionalNode from './nodes/ConditionalNode';
 import DelayNode from './nodes/DelayNode';
 import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
+import SecretManager from './SecretManager';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -35,6 +38,8 @@ import IsometricBackground from './IsometricBackground';
 const nodeTypes = {
   webhook: WebhookNode,
   geminiFactory: GeminiFactoryNode,
+  chatgptFactory: ChatGPTFactoryNode,
+  claudeFactory: ClaudeFactoryNode,
   output: OutputNode,
   httpRequest: HttpRequestNode,
   conditional: ConditionalNode,
@@ -60,6 +65,7 @@ export default function CityCanvas() {
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [visualMode, setVisualMode] = useState<'roads' | 'pipes'>('roads');
+  const [isSecretManagerOpen, setIsSecretManagerOpen] = useState(false);
   
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
@@ -344,7 +350,7 @@ export default function CityCanvas() {
   return (
     <div className="w-full h-full relative bg-[#4CAF50] flex">
       {/* Toolbox on the left */}
-      <Toolbox />
+      <Toolbox onOpenSecretManager={() => setIsSecretManagerOpen(true)} />
 
       {/* Main Canvas Area */}
       <div className="flex-1 h-full w-full relative overflow-hidden bg-[#d2b48c]" onDragOver={onDragOver} onDrop={onDrop}>
@@ -414,6 +420,11 @@ export default function CityCanvas() {
         nodes={nodes}
         edges={edges}
       />
+
+      {/* Secret Manager Modal */}
+      {isSecretManagerOpen && (
+        <SecretManager onClose={() => setIsSecretManagerOpen(false)} />
+      )}
     </div>
   );
 }

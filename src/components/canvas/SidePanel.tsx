@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 
+const globalModelCache: Record<string, string[]> = {};
+const globalCredCache: Record<string, any[]> = {};
+
 const JsonNode = ({ keyName, value, path, onInsert }: any) => {
   const [expanded, setExpanded] = useState(true);
   const isObject = value !== null && typeof value === 'object';
@@ -50,6 +53,8 @@ const toolAssets: Record<string, string> = {
   webhook: 'webhook_tower.png',
   httpRequest: 'http_request.png',
   geminiFactory: 'gemini_factory.png',
+  chatgptFactory: 'chatgpt_factory.png',
+  claudeFactory: 'claude_factory.png',
   conditional: 'conditional_gate.png',
   delay: 'delay_stop.png',
   output: 'output_dock.png'
@@ -73,16 +78,96 @@ export default function SidePanel({
   const [newCredName, setNewCredName] = useState('');
   const [newCredKey, setNewCredKey] = useState('');
   const [isSavingCred, setIsSavingCred] = useState(false);
+  const [activeTabs, setActiveTabs] = useState<string[]>(['input', 'tasks', 'logs']);
+  
+  const [dynamicModels, setDynamicModels] = useState<string[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  const toggleTab = (tabId: string) => {
+    setActiveTabs(prev => {
+      if (prev.includes(tabId)) {
+        if (prev.length === 1) return prev; // Prevent closing the last tab
+        return prev.filter(t => t !== tabId);
+      }
+      return [...prev, tabId];
+    });
+  };
+
+  const TabButton = ({ id, label }: { id: string, label: string }) => {
+    const isActive = activeTabs.includes(id);
+    return (
+      <button 
+        onClick={() => toggleTab(id)}
+        className={`px-6 py-2 font-bold uppercase tracking-widest text-sm border-[4px] border-[#1a1a1a] border-b-0 transition-colors ${
+          isActive ? 'bg-[#d8c8b8] text-[#1a1a1a]' : 'bg-[#1a1a1a] text-gray-500 hover:text-gray-300'
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
 
   // Fetch credentials when a node that needs them is selected
   useEffect(() => {
-    if (selectedNode?.type === 'geminiFactory') {
-      fetch(`/api/credentials?type=gemini`)
+    let credType = '';
+    if (selectedNode?.type === 'geminiFactory') credType = 'gemini';
+    if (selectedNode?.type === 'chatgptFactory') credType = 'openai';
+    if (selectedNode?.type === 'claudeFactory') credType = 'anthropic';
+    
+    if (credType) {
+      if (globalCredCache[credType]) {
+        setCredentials(globalCredCache[credType]);
+      }
+      fetch(`/api/credentials?type=${credType}`)
         .then(res => res.json())
-        .then(data => setCredentials(Array.isArray(data) ? data : []))
+        .then(data => {
+          if (Array.isArray(data)) {
+            globalCredCache[credType] = data;
+            setCredentials(data);
+          }
+        })
         .catch(console.error);
     }
   }, [selectedNode?.type]);
+
+  const fetchModels = async (credId: string, forceRefresh = false) => {
+    if (!forceRefresh && globalModelCache[credId]) {
+      setDynamicModels(globalModelCache[credId]);
+      return;
+    }
+    setIsLoadingModels(true);
+    setModelsError(null);
+    if (!forceRefresh && !dynamicModels.length) setDynamicModels([]);
+    try {
+      const res = await fetch(`/api/models?credentialId=${credId}`);
+      const result = await res.json();
+      if (result.error) {
+        setModelsError(result.error);
+      } else if (result.models) {
+        globalModelCache[credId] = result.models;
+        setDynamicModels(result.models);
+      }
+    } catch (err: any) {
+      setModelsError(err.message);
+    } finally {
+      setIsLoadingModels(false);
+    }
+  };
+
+  const data = selectedNode?.data || {};
+
+  useEffect(() => {
+    if (data.credentialId && ['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode?.type)) {
+      if (data.model && !globalModelCache[data.credentialId]) {
+        setDynamicModels([data.model]);
+      }
+      fetchModels(data.credentialId);
+    } else {
+      setDynamicModels([]);
+      setModelsError(null);
+    }
+  }, [data.credentialId, selectedNode?.type]);
 
   if (!selectedNode) return null;
 
@@ -92,7 +177,7 @@ export default function SidePanel({
 
   const handleInsertVariable = (path: string) => {
     const templateTag = `{{${path}}}`;
-    if (selectedNode.type === 'geminiFactory') {
+    if (['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type)) {
       const currentPrompt = selectedNode.data?.prompt || '';
       handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'httpRequest') {
@@ -108,9 +193,10 @@ export default function SidePanel({
     if (!newCredName || !newCredKey) return;
     setIsSavingCred(true);
     try {
-      // The node type dictates the credential type
       let credType = '';
       if (selectedNode.type === 'geminiFactory') credType = 'gemini';
+      if (selectedNode.type === 'chatgptFactory') credType = 'openai';
+      if (selectedNode.type === 'claudeFactory') credType = 'anthropic';
       
       const res = await fetch('/api/credentials', {
         method: 'POST',
@@ -133,7 +219,7 @@ export default function SidePanel({
     }
   };
 
-  const data = selectedNode.data || {};
+
   const assetName = toolAssets[selectedNode.type];
 
   // Calculate inputs for the 'Input' tab
@@ -241,239 +327,283 @@ export default function SidePanel({
             </div>
           </div>
 
-          {/* RIGHT COLUMN (3/4 Width) - 3 Columns (Input, Tasks, Logs) */}
-          <div className="w-3/4 flex flex-row gap-4">
+          {/* RIGHT COLUMN (3/4 Width) - Toggleable Tabs */}
+          <div className="w-3/4 flex flex-col">
             
-            {/* COLUMN 1: INPUT */}
-            <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-col overflow-hidden">
-              <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Input</h3>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto space-y-4">
-                {incomingNodes.length === 0 ? (
-                  <div className="text-gray-500 italic h-full flex items-center justify-center text-center">
-                    No incoming connections.
-                  </div>
-                ) : (
-                  <div className="space-y-4 h-full flex flex-col">
-                    {incomingNodes.map((node: any) => (
-                      <div key={node.id} className="bg-[#1a1a1a] p-4 pr-0 border-[3px] border-[#2d2d2d] flex-1 flex flex-col">
-                        <div className="text-[#4af626] font-bold text-xs uppercase mb-2 mr-4 flex justify-between">
-                          <span>SOURCE: {node.type}</span>
-                        </div>
-                        {renderInputSource(node)}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            {/* TAB BAR */}
+            <div className="flex gap-2 px-4">
+              <TabButton id="input" label="Input" />
+              <TabButton id="tasks" label="Tasks" />
+              <TabButton id="logs" label="Logs" />
             </div>
 
-            {/* COLUMN 2: TASKS (Configuration) */}
-            <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-col overflow-hidden">
-              <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                {selectedNode.type === 'geminiFactory' && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
-                      <div className="flex gap-2">
-                        <select
-                          value={data.credentialId || ''}
-                          onChange={(e) => handleChange('credentialId', e.target.value)}
-                          className="flex-1 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
-                        >
-                          <option value="">-- Select Credential --</option>
-                          {credentials.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                        <button 
-                          onClick={() => setShowNewCredForm(!showNewCredForm)}
-                          className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-[#4af626] border-[3px] border-[#2d2d2d] px-4 font-bold text-xl transition-colors"
-                        >
-                          {showNewCredForm ? '-' : '+'}
-                        </button>
+            {/* UNIFIED CONTAINER */}
+            <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-row overflow-hidden relative">
+              
+              {/* COLUMN 1: INPUT */}
+              {activeTabs.includes('input') && (
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
+                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Input</h3>
+                  </div>
+                  <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                    {incomingNodes.length === 0 ? (
+                      <div className="text-gray-500 italic h-full flex items-center justify-center text-center">
+                        No incoming connections.
                       </div>
-                      
-                      {showNewCredForm && (
-                        <div className="mt-2 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] space-y-4">
-                          <h4 className="text-[#c4b4a4] font-bold text-xs uppercase tracking-widest border-b border-[#333] pb-2">Create New Credential</h4>
-                          <div>
-                            <label className="block text-xs font-bold mb-1 text-gray-400">Credential Name</label>
+                    ) : (
+                      <div className="space-y-4 h-full flex flex-col">
+                        {incomingNodes.map((node: any) => (
+                          <div key={node.id} className="bg-[#1a1a1a] p-4 pr-0 border-[3px] border-[#2d2d2d] flex-1 flex flex-col">
+                            <div className="text-[#4af626] font-bold text-xs uppercase mb-2 mr-4 flex justify-between">
+                              <span>SOURCE: {node.type}</span>
+                            </div>
+                            {renderInputSource(node)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* COLUMN 2: TASKS (Configuration) */}
+              {activeTabs.includes('tasks') && (
+                <div className={`flex-1 flex flex-col overflow-hidden ${activeTabs.includes('input') ? 'border-l-[4px] border-[#1a1a1a]' : ''}`}>
+                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
+                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
+                  </div>
+                  <div className="flex-1 p-4 overflow-y-auto space-y-6">
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && (
+                      <>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={data.credentialId || ''}
+                              onChange={(e) => handleChange('credentialId', e.target.value)}
+                              className="flex-1 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            >
+                              <option value="">-- Select Credential --</option>
+                              {credentials.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+
+                            <button 
+                              onClick={() => setShowNewCredForm(!showNewCredForm)}
+                              className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-[#4af626] border-[3px] border-[#2d2d2d] px-4 font-bold text-xl transition-colors"
+                            >
+                              {showNewCredForm ? '-' : '+'}
+                            </button>
+                          </div>
+                          
+                          {showNewCredForm && (
+                            <div className="mt-2 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] space-y-4">
+                              <h4 className="text-[#c4b4a4] font-bold text-xs uppercase tracking-widest border-b border-[#333] pb-2">Create New Credential</h4>
+                              <div>
+                                <label className="block text-xs font-bold mb-1 text-gray-400">Credential Name</label>
+                                <input
+                                  type="text"
+                                  value={newCredName}
+                                  onChange={(e) => setNewCredName(e.target.value)}
+                                  placeholder="e.g. My Personal API Key"
+                                  className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-bold mb-1 text-gray-400">API Key</label>
+                                <input
+                                  type="password"
+                                  value={newCredKey}
+                                  onChange={(e) => setNewCredKey(e.target.value)}
+                                  placeholder="sk-..."
+                                  className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                                />
+                              </div>
+                              <button
+                                onClick={handleCreateCredential}
+                                disabled={!newCredName || !newCredKey || isSavingCred}
+                                className="w-full bg-[#4af626] hover:bg-[#3ade1d] text-black font-bold py-2 px-4 uppercase tracking-wider disabled:opacity-50"
+                              >
+                                {isSavingCred ? 'Saving...' : 'Save & Select'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
+                            <span>AI Model Version</span>
+                            {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && data.credentialId && (
+                               <button 
+                                 onClick={() => fetchModels(data.credentialId, true)}
+                                 className="text-black hover:text-gray-700 transition-colors"
+                                 title="Reload Models"
+                               >
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
+                               </button>
+                            )}
+                          </label>
+                          {isLoadingModels ? (
+                             <div className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] font-bold animate-pulse text-sm">Fetching live models...</div>
+                          ) : modelsError === 'Credential not found' || !data.credentialId ? (
+                             <div className="w-full bg-[#1a1a1a] text-gray-500 p-3 border-[3px] border-[#2d2d2d] font-mono text-sm">
+                               Select a valid credential to load models.
+                             </div>
+                          ) : modelsError ? (
+                             <div className="w-full bg-[#1a1a1a] text-red-500 p-3 border-[3px] border-red-900 font-bold text-sm">
+                               Error: {modelsError}
+                             </div>
+                          ) : (
+                            <select
+                              value={data.model || ''}
+                              onChange={(e) => handleChange('model', e.target.value)}
+                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            >
+                              <option value="">-- Select Model --</option>
+                              {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && (
+                                dynamicModels.map(m => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))
+                              )}
+                            </select>
+                          )}
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Instruction Prompt</label>
+                          <textarea
+                            value={data.prompt || ''}
+                            onChange={(e) => handleChange('prompt', e.target.value)}
+                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            placeholder="Summarize this: {{lastOutput}}"
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {selectedNode.type === 'httpRequest' && (
+                      <>
+                        <div className="flex gap-4">
+                          <div className="w-1/4">
+                            <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Method</label>
+                            <select
+                              value={data.method || 'GET'}
+                              onChange={(e) => handleChange('method', e.target.value)}
+                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            >
+                              <option value="GET">GET</option>
+                              <option value="POST">POST</option>
+                              <option value="PUT">PUT</option>
+                              <option value="DELETE">DELETE</option>
+                            </select>
+                          </div>
+                          <div className="w-3/4">
+                            <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Target URL</label>
                             <input
                               type="text"
-                              value={newCredName}
-                              onChange={(e) => setNewCredName(e.target.value)}
-                              placeholder="e.g. My Personal Gemini Key"
-                              className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                              value={data.url || ''}
+                              onChange={(e) => handleChange('url', e.target.value)}
+                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                              placeholder="https://api.example.com/data"
                             />
                           </div>
-                          <div>
-                            <label className="block text-xs font-bold mb-1 text-gray-400">API Key</label>
-                            <input
-                              type="password"
-                              value={newCredKey}
-                              onChange={(e) => setNewCredKey(e.target.value)}
-                              placeholder="AIzaSy..."
-                              className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
-                            />
-                          </div>
-                          <button
-                            onClick={handleCreateCredential}
-                            disabled={!newCredName || !newCredKey || isSavingCred}
-                            className="w-full bg-[#4af626] hover:bg-[#3ade1d] text-black font-bold py-2 px-4 uppercase tracking-wider disabled:opacity-50"
-                          >
-                            {isSavingCred ? 'Saving...' : 'Save & Select'}
-                          </button>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Headers (JSON)</label>
+                          <textarea
+                            value={data.headers || ''}
+                            onChange={(e) => handleChange('headers', e.target.value)}
+                            className="w-full h-20 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            placeholder='{"Content-Type": "application/json"}'
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Body (JSON)</label>
+                          <textarea
+                            value={data.body || ''}
+                            onChange={(e) => handleChange('body', e.target.value)}
+                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            placeholder='{"data": "{{previous_node.value}}"}'
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {selectedNode.type === 'delay' && (
+                      <div>
+                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Wait Duration (ms)</label>
+                        <input
+                          type="number"
+                          value={data.delayMs || 5000}
+                          onChange={(e) => handleChange('delayMs', parseInt(e.target.value))}
+                          className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                          placeholder="5000"
+                        />
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'conditional' && (
+                      <div>
+                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Route to False If Output Contains:</label>
+                        <input
+                          type="text"
+                          value={data.matchText || 'error'}
+                          onChange={(e) => handleChange('matchText', e.target.value)}
+                          className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                          placeholder="error"
+                        />
+                      </div>
+                    )}
+                    
+                    {selectedNode.type === 'webhook' && (
+                      <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
+                        <div className="animate-pulse mb-2">● LISTENING FOR TRIGGER</div>
+                        The Webhook acts as the starting trigger. No configuration is required.
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'output' && (
+                      <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
+                        <div className="mb-2 text-orange-500 font-bold">» END OF LINE «</div>
+                        The Output node marks the final destination of the workflow. Check the LOGS to see the final output!
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* COLUMN 3: LOGS */}
+              {activeTabs.includes('logs') && (
+                <div className={`flex-1 flex flex-col overflow-hidden ${(activeTabs.includes('input') || activeTabs.includes('tasks')) ? 'border-l-[4px] border-[#1a1a1a]' : ''}`}>
+                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
+                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Logs</h3>
+                  </div>
+                  <div className="flex-1 p-4 overflow-y-auto">
+                    <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col">
+                      <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between">
+                        <span>SYSTEM OUTPUT</span>
+                        <span className="text-gray-500">READY</span>
+                      </div>
+                      {data.output ? (
+                        <textarea 
+                          readOnly 
+                          className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
+                          value={data.output}
+                        />
+                      ) : (
+                        <div className="flex-1 flex items-center justify-center flex-col text-gray-600 font-mono text-sm">
+                          <div className="animate-bounce mb-2">_</div>
+                          Waiting for execution...
                         </div>
                       )}
                     </div>
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">AI Model Version</label>
-                      <select
-                        value={data.model || 'gemini-3.1-flash-lite'}
-                        onChange={(e) => handleChange('model', e.target.value)}
-                        className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
-                      >
-                        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-                        <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Instruction Prompt</label>
-                      <textarea
-                        value={data.prompt || ''}
-                        onChange={(e) => handleChange('prompt', e.target.value)}
-                        className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
-                        placeholder="Summarize this: {{lastOutput}}"
-                      />
-                    </div>
-                  </>
-                )}
-
-                {selectedNode.type === 'httpRequest' && (
-                  <>
-                    <div className="flex gap-4">
-                      <div className="w-1/4">
-                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Method</label>
-                        <select
-                          value={data.method || 'GET'}
-                          onChange={(e) => handleChange('method', e.target.value)}
-                          className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
-                        >
-                          <option value="GET">GET</option>
-                          <option value="POST">POST</option>
-                          <option value="PUT">PUT</option>
-                          <option value="DELETE">DELETE</option>
-                        </select>
-                      </div>
-                      <div className="w-3/4">
-                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] whitespace-nowrap">Target URL</label>
-                        <input
-                          type="text"
-                          value={data.url || ''}
-                          onChange={(e) => handleChange('url', e.target.value)}
-                          className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
-                          placeholder="https://api.example.com/data"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Headers (JSON)</label>
-                      <textarea
-                        value={data.headers || ''}
-                        onChange={(e) => handleChange('headers', e.target.value)}
-                        className="w-full h-20 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
-                        placeholder='{"Content-Type": "application/json"}'
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Body (JSON)</label>
-                      <textarea
-                        value={data.body || ''}
-                        onChange={(e) => handleChange('body', e.target.value)}
-                        className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
-                        placeholder='{"data": "{{previous_node.value}}"}'
-                      />
-                    </div>
-                  </>
-                )}
-
-                {selectedNode.type === 'delay' && (
-                  <div>
-                    <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Wait Duration (ms)</label>
-                    <input
-                      type="number"
-                      value={data.delayMs || 5000}
-                      onChange={(e) => handleChange('delayMs', parseInt(e.target.value))}
-                      className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
-                      placeholder="5000"
-                    />
                   </div>
-                )}
-
-                {selectedNode.type === 'conditional' && (
-                  <div>
-                    <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Route to False If Output Contains:</label>
-                    <input
-                      type="text"
-                      value={data.matchText || 'error'}
-                      onChange={(e) => handleChange('matchText', e.target.value)}
-                      className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
-                      placeholder="error"
-                    />
-                  </div>
-                )}
-                
-                {selectedNode.type === 'webhook' && (
-                  <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                    <div className="animate-pulse mb-2">● LISTENING FOR TRIGGER</div>
-                    The Webhook acts as the starting trigger. No configuration is required.
-                  </div>
-                )}
-
-                {selectedNode.type === 'output' && (
-                  <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                    <div className="mb-2 text-orange-500 font-bold">» END OF LINE «</div>
-                    The Output node marks the final destination of the workflow. Check the LOGS to see the final output!
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* COLUMN 3: LOGS */}
-            <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-col overflow-hidden">
-              <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Logs</h3>
-              </div>
-              <div className="flex-1 p-4 overflow-y-auto">
-                <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col">
-                  <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between">
-                    <span>SYSTEM OUTPUT</span>
-                    <span className="text-gray-500">READY</span>
-                  </div>
-                  {data.output ? (
-                    <textarea 
-                      readOnly 
-                      className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
-                      value={data.output}
-                    />
-                  ) : (
-                    <div className="flex-1 flex items-center justify-center flex-col text-gray-600 font-mono text-sm">
-                      <div className="animate-bounce mb-2">_</div>
-                      Waiting for execution...
-                    </div>
-                  )}
                 </div>
-              </div>
-            </div>
+              )}
 
+            </div>
           </div>
         </div>
       </div>
