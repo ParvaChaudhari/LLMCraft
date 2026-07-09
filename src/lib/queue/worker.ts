@@ -114,6 +114,27 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Passing Limit node ${nodeId}: ${currentCount + 1}/${maxItems}`);
   }
 
+  // Pinned Node: Skip execution, use cached output
+  if (currentNode.data?.isPinned && currentNode.data?.pinnedOutput !== undefined) {
+    console.log(`[Queue] Node ${nodeId} is pinned — using cached output.`);
+    newContext.lastOutput = currentNode.data.pinnedOutput;
+    newContext[nodeId] = currentNode.data.pinnedOutput;
+
+    const outgoingEdges = edges.filter((e: any) => e.source === nodeId);
+    await broadcastEvent(workflowId, 'NODE_FINISHED', {
+      nodeId,
+      type: currentNode.type,
+      output: newContext.lastOutput,
+      isLastNode: outgoingEdges.length === 0,
+    });
+    for (const edge of outgoingEdges) {
+      await workflowQueue.add('execute-node', {
+        workflowId, nodeId: edge.target, nodes, edges, context: newContext
+      });
+    }
+    return;
+  }
+
   // 1. Run specific node logic
   if (currentNode.type === 'geminiFactory') {
     let apiKey = process.env.GEMINI_API_KEY;

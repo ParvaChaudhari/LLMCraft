@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { buildNodeContext } from '@/lib/buildNodeContext';
 
 const globalModelCache: Record<string, string[]> = {};
 const globalCredCache: Record<string, any[]> = {};
@@ -84,6 +85,8 @@ export default function SidePanel({
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
+  const [isNodeRunning, setIsNodeRunning] = useState(false);
+  const nodeEventSourceRef = useRef<EventSource | null>(null);
 
   const toggleTab = (tabId: string) => {
     setActiveTabs(prev => {
@@ -174,6 +177,56 @@ export default function SidePanel({
 
   const handleChange = (key: string, value: any) => {
     updateNodeData(selectedNode.id, { [key]: value });
+  };
+
+  const executeNodeStandalone = async () => {
+    if (isNodeRunning) return;
+    setIsNodeRunning(true);
+    // Clear current output and show loader
+    updateNodeData(selectedNode.id, { output: undefined, isLoading: true });
+
+    if (nodeEventSourceRef.current) nodeEventSourceRef.current.close();
+
+    // Build context from upstream pinned/previous outputs
+    const context = buildNodeContext(selectedNode.id, nodes, edges);
+
+    try {
+      const res = await fetch('/api/execute-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: selectedNode.id, nodes, edges, context }),
+      });
+      const resData = await res.json();
+      if (!resData.workflowId) throw new Error('No workflowId returned');
+
+      const es = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
+      nodeEventSourceRef.current = es;
+
+      es.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const { event: eventName, data: eventData } = payload;
+          if (eventName === 'NODE_FINISHED' && eventData.nodeId === selectedNode.id) {
+            updateNodeData(selectedNode.id, { output: eventData.output, isLoading: false });
+            setIsNodeRunning(false);
+            es.close();
+          }
+          if (eventName === 'NODE_FINISHED' && eventData.isLastNode) {
+            setIsNodeRunning(false);
+            es.close();
+          }
+        } catch (e) { /* ignore parse errors */ }
+      };
+
+      es.onerror = () => {
+        setIsNodeRunning(false);
+        updateNodeData(selectedNode.id, { isLoading: false });
+        es.close();
+      };
+    } catch (err) {
+      setIsNodeRunning(false);
+      updateNodeData(selectedNode.id, { isLoading: false });
+    }
   };
 
   const handleInsertVariable = (path: string) => {
@@ -620,6 +673,30 @@ export default function SidePanel({
                       <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
                         <div className="animate-pulse mb-2">● LISTENING FOR TRIGGER</div>
                         The Webhook acts as the starting trigger. No configuration is required.
+                      </div>
+                    )}
+
+                    {/* Standalone Execute Button */}
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'webhook'].includes(selectedNode.type) && (
+                      <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
+                        <button
+                          onClick={executeNodeStandalone}
+                          disabled={isNodeRunning}
+                          className={`w-full py-3 font-bold text-sm uppercase tracking-widest border-[3px] transition-colors flex items-center justify-center gap-2 ${
+                            isNodeRunning
+                              ? 'bg-[#1a1a1a] text-gray-500 border-[#2d2d2d] cursor-not-allowed'
+                              : 'bg-[#4af626] hover:bg-[#3ade1d] text-black border-[#3ade1d] hover:border-[#2ac514]'
+                          }`}
+                        >
+                          {isNodeRunning ? (
+                            <>
+                              <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
+                              Running...
+                            </>
+                          ) : (
+                            <> ▶ Execute Node </>
+                          )}
+                        </button>
                       </div>
                     )}
 

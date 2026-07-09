@@ -2,7 +2,20 @@ import { Handle, Position, useReactFlow } from '@xyflow/react';
 import DiamondHighlight from './DiamondHighlight';
 
 export default function ChatGPTFactoryNode({ id, data, selected }: { id: string, data: any, selected?: boolean }) {
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, setNodes } = useReactFlow();
+
+  const togglePin = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setNodes(nds => nds.map(n => {
+      if (n.id !== id) return n;
+      if (n.data.isPinned) {
+        const { isPinned, pinnedOutput, ...rest } = n.data;
+        return { ...n, data: rest };
+      }
+      return { ...n, data: { ...n.data, isPinned: true, pinnedOutput: n.data.output } };
+    }));
+  };
+
   return (
     <div className="relative group" style={{ width: 192, height: 96 }}>
       <button 
@@ -15,6 +28,18 @@ export default function ChatGPTFactoryNode({ id, data, selected }: { id: string,
       >
         X
       </button>
+      <button
+        onClick={togglePin}
+        className={`absolute top-0 right-6 w-5 h-5 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 flex items-center justify-center pointer-events-auto border ${
+          data.isPinned ? 'bg-yellow-500 border-yellow-700 opacity-100' : 'bg-[#2d2d2d] border-[#1a1a1a] hover:bg-yellow-500'
+        }`}
+        title={data.isPinned ? 'Unpin output' : 'Pin output'}
+      >
+        📌
+      </button>
+      {data.isPinned && (
+        <div className="absolute top-0 left-0 bg-yellow-500 text-black text-[8px] font-bold px-1 rounded-br z-50 pointer-events-none">PINNED</div>
+      )}
       {selected && <DiamondHighlight cols={3} rows={3} />}
 
       <Handle type="target" position={Position.Left} className="w-2 h-2 bg-[#74aa9c] border-none rounded-full z-10" style={{ left: 48, top: 64 }} />
