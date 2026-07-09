@@ -40,6 +40,23 @@ function screenToIsoSteps(dx: number, dy: number): { a: number; b: number } {
 }
 
 /**
+ * Snap a screen-space point to the nearest isometric grid cell center.
+ */
+function snapToIsoGrid(px: number, py: number): { x: number; y: number } {
+  // Convert screen to fractional iso coords
+  const a = px / TILE_W + py / TILE_H;
+  const b = -px / TILE_W + py / TILE_H;
+  // Round to nearest cell
+  const aR = Math.round(a);
+  const bR = Math.round(b);
+  // Convert back to screen space
+  return {
+    x: (aR - bR) * (TILE_W / 2),
+    y: (aR + bR) * (TILE_H / 2),
+  };
+}
+
+/**
  * Generate a sequence of grid points from (sx,sy) to (tx,ty).
  */
 export function routeIsometric(
@@ -53,13 +70,20 @@ export function routeIsometric(
 
   if (Math.abs(dx) < 4 && Math.abs(dy) < 4) return [];
 
-  const { a: aRaw, b: bRaw } = screenToIsoSteps(dx, dy);
+  // Snap source and target to nearest grid cells
+  const src = snapToIsoGrid(sx, sy);
+  const tgt = snapToIsoGrid(tx, ty);
+
+  const sdx = tgt.x - src.x;
+  const sdy = tgt.y - src.y;
+
+  const { a: aRaw, b: bRaw } = screenToIsoSteps(sdx, sdy);
   const aSteps = Math.round(aRaw);
   const bSteps = Math.round(bRaw);
 
   const points: GridPoint[] = [];
-  let curX = sx;
-  let curY = sy;
+  let curX = src.x;
+  let curY = src.y;
 
   const aSign = Math.sign(aSteps) || 1;
   const aAxis = { x: AXIS_A.x * aSign, y: AXIS_A.y * aSign };

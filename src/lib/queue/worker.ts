@@ -128,6 +128,11 @@ const executeNode = async (job: Job) => {
       isLastNode: outgoingEdges.length === 0,
     });
     for (const edge of outgoingEdges) {
+      await broadcastEvent(workflowId, 'EDGE_TRAVERSED', {
+        edgeId: edge.id,
+        source: nodeId,
+        target: edge.target,
+      });
       await workflowQueue.add('execute-node', {
         workflowId, nodeId: edge.target, nodes, edges, context: newContext
       });

@@ -196,7 +196,17 @@ export default function SidePanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nodeId: selectedNode.id, nodes, edges, context }),
       });
-      const resData = await res.json();
+
+      let resData;
+      const rawText = await res.text();
+      try {
+        resData = JSON.parse(rawText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON. Raw response:', rawText);
+        throw new Error(`Server returned invalid JSON (Status: ${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(resData.error || 'Failed to execute node');
       if (!resData.workflowId) throw new Error('No workflowId returned');
 
       const es = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
@@ -677,7 +687,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'webhook'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

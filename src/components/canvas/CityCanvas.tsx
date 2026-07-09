@@ -277,11 +277,20 @@ export default function CityCanvas() {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges })
+        body: JSON.stringify({ nodes, edges }),
       });
-      const resData = await res.json();
-      
-      if (!resData.workflowId) throw new Error("No workflowId returned");
+
+      let resData;
+      const rawText = await res.text();
+      try {
+        resData = JSON.parse(rawText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON. Raw response:', rawText);
+        throw new Error(`Server returned invalid JSON (Status: ${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(resData.error || 'Execution failed');
+      if (!resData.workflowId) throw new Error('No workflowId returned');
 
       const eventSource = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
       eventSourceRef.current = eventSource;
