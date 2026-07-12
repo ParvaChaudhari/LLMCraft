@@ -141,142 +141,95 @@ const executeNode = async (job: Job) => {
   }
 
   // 1. Run specific node logic
-  if (currentNode.type === 'geminiFactory') {
-    let apiKey = process.env.GEMINI_API_KEY;
+  if (['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(currentNode.type)) {
     const credentialId = currentNode.data?.credentialId;
+    // For Gemini, fallback to process.env if no credentialId is provided
+    let apiKey = (currentNode.type === 'geminiFactory' && !credentialId) 
+      ? process.env.GEMINI_API_KEY 
+      : await fetchApiKey(credentialId);
 
-    if (credentialId) {
-      console.log(`[Queue] Fetching credential ${credentialId} from database...`);
-      const supabase = createClient();
-      const { data: credData, error } = await supabase
-        .from('credentials')
-        .select('encrypted_data')
-        .eq('id', credentialId)
-        .single();
-      
-      if (error || !credData) {
-        console.error(`[Queue] Failed to load credential:`, error?.message);
-        newContext.lastOutput = `Error: Failed to load credential (${error?.message || 'Not found'})`;
-        await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
-        return;
-      }
-
-      try {
-        apiKey = decrypt(credData.encrypted_data);
-        console.log(`[Queue] Successfully decrypted credential for Gemini.`);
-      } catch (decErr: any) {
-        console.error(`[Queue] Decryption failed:`, decErr.message);
-        newContext.lastOutput = `Error: Failed to decrypt credential`;
-        await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
-        return;
-      }
-    }
-
-    if (apiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const modelName = currentNode.data?.model || "gemini-3.1-flash-lite";
-        const model = genAI.getGenerativeModel({ model: modelName });
-        
-        const rawPrompt = currentNode.data?.prompt || "Tell me a short 1 sentence joke about city builders.";
-        const prompt = replaceVariables(rawPrompt, newContext);
-        
-        console.log(`[Queue] Calling Gemini (${modelName}) with prompt: ${prompt}`);
-        
-        const result = await model.generateContent(prompt);
-        newContext.lastOutput = result.response.text();
-        newContext[nodeId] = newContext.lastOutput; // Save to context by node ID too
-        console.log(`[Queue] Gemini Output: ${newContext.lastOutput.trim()}`);
-      } catch (err: any) {
-        console.error(`[Queue] Gemini Error:`, err.message);
-        throw err;
-      }
-    } else {
-      console.log(`[Queue] No Gemini API key found.`);
-      newContext.lastOutput = "Error: No Gemini API Key or Credential selected.";
-    }
-  } else if (currentNode.type === 'chatgptFactory') {
-    const credentialId = currentNode.data?.credentialId;
-    const apiKey = await fetchApiKey(credentialId);
-    
     if (!apiKey) {
-      newContext.lastOutput = "Error: Invalid or missing OpenAI API Key.";
+      console.log(`[Queue] No API key found for ${currentNode.type}.`);
+      newContext.lastOutput = `Error: No valid API Key or Credential selected for ${currentNode.type}.`;
       newContext[nodeId] = newContext.lastOutput;
     } else {
-      const rawPrompt = currentNode.data?.prompt || "Tell me a joke.";
+      const defaultPrompts: Record<string, string> = {
+        geminiFactory: "Tell me a short 1 sentence joke about city builders.",
+        chatgptFactory: "Tell me a joke.",
+        claudeFactory: "Write a haiku."
+      };
+      
+      const defaultModels: Record<string, string> = {
+        geminiFactory: "gemini-3.1-flash-lite",
+        chatgptFactory: "gpt-4o",
+        claudeFactory: "claude-3-5-sonnet-20240620"
+      };
+
+      const rawPrompt = currentNode.data?.prompt || defaultPrompts[currentNode.type];
       const prompt = replaceVariables(rawPrompt, newContext);
-      const model = currentNode.data?.model || "gpt-4o";
-      
-      console.log(`[Queue] Calling OpenAI (${model}) with prompt: ${prompt}`);
-      
+      const modelName = currentNode.data?.model || defaultModels[currentNode.type];
+
+      console.log(`[Queue] Calling ${currentNode.type} (${modelName}) with prompt: ${prompt}`);
+
       try {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message || 'OpenAI API Error');
-        
-        newContext.lastOutput = data.choices?.[0]?.message?.content || "No output returned.";
-        newContext[nodeId] = newContext.lastOutput;
-        console.log(`[Queue] ChatGPT Output: ${newContext.lastOutput.trim()}`);
+        let output = "";
+
+        switch (currentNode.type) {
+          case 'geminiFactory': {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({ model: modelName });
+            const result = await model.generateContent(prompt);
+            output = result.response.text();
+            break;
+          }
+          case 'chatgptFactory': {
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify({
+                model: modelName,
+                messages: [{ role: 'user', content: prompt }]
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || 'OpenAI API Error');
+            output = data.choices?.[0]?.message?.content || "No output returned.";
+            break;
+          }
+          case 'claudeFactory': {
+            const res = await fetch('https://api.anthropic.com/v1/messages', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': apiKey,
+                'anthropic-version': '2023-06-01'
+              },
+              body: JSON.stringify({
+                model: modelName,
+                max_tokens: 1024,
+                messages: [{ role: 'user', content: prompt }]
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error?.message || 'Anthropic API Error');
+            output = data.content?.[0]?.text || "No output returned.";
+            break;
+          }
+        }
+
+        newContext.lastOutput = output;
+        newContext[nodeId] = output;
+        console.log(`[Queue] ${currentNode.type} Output: ${output.trim()}`);
       } catch (err: any) {
-        console.error(`[Queue] ChatGPT Error:`, err.message);
+        console.error(`[Queue] ${currentNode.type} Error:`, err.message);
         newContext.lastOutput = `Error: ${err.message}`;
         newContext[nodeId] = newContext.lastOutput;
       }
     }
-    
-  } else if (currentNode.type === 'claudeFactory') {
-    const credentialId = currentNode.data?.credentialId;
-    const apiKey = await fetchApiKey(credentialId);
-    
-    if (!apiKey) {
-      newContext.lastOutput = "Error: Invalid or missing Anthropic API Key.";
-      newContext[nodeId] = newContext.lastOutput;
-    } else {
-      const rawPrompt = currentNode.data?.prompt || "Write a haiku.";
-      const prompt = replaceVariables(rawPrompt, newContext);
-      const model = currentNode.data?.model || "claude-3-5-sonnet-20240620";
-      
-      console.log(`[Queue] Calling Claude (${model}) with prompt: ${prompt}`);
-      
-      try {
-        const res = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: model,
-            max_tokens: 1024,
-            messages: [{ role: 'user', content: prompt }]
-          })
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error?.message || 'Anthropic API Error');
-        
-        newContext.lastOutput = data.content?.[0]?.text || "No output returned.";
-        newContext[nodeId] = newContext.lastOutput;
-        console.log(`[Queue] Claude Output: ${newContext.lastOutput.trim()}`);
-      } catch (err: any) {
-        console.error(`[Queue] Claude Error:`, err.message);
-        newContext.lastOutput = `Error: ${err.message}`;
-        newContext[nodeId] = newContext.lastOutput;
-      }
-    }
-    
+
   } else if (currentNode.type === 'httpRequest') {
     const url = replaceVariables(currentNode.data?.url || "https://jsonplaceholder.typicode.com/posts/1", newContext);
     const method = currentNode.data?.method || "GET";

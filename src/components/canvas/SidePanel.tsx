@@ -4,6 +4,15 @@ import { buildNodeContext } from '@/lib/buildNodeContext';
 const globalModelCache: Record<string, string[]> = {};
 const globalCredCache: Record<string, any[]> = {};
 
+const LLM_NODE_TYPES = ['geminiFactory', 'chatgptFactory', 'claudeFactory'];
+
+const getCredentialProvider = (nodeType: string): string | null => {
+  if (nodeType === 'geminiFactory') return 'gemini';
+  if (nodeType === 'chatgptFactory') return 'openai';
+  if (nodeType === 'claudeFactory') return 'anthropic';
+  return null;
+};
+
 const JsonNode = ({ keyName, value, path, onInsert }: any) => {
   const [expanded, setExpanded] = useState(true);
   const isObject = value !== null && typeof value === 'object';
@@ -114,10 +123,7 @@ export default function SidePanel({
 
   // Fetch credentials when a node that needs them is selected
   useEffect(() => {
-    let credType = '';
-    if (selectedNode?.type === 'geminiFactory') credType = 'gemini';
-    if (selectedNode?.type === 'chatgptFactory') credType = 'openai';
-    if (selectedNode?.type === 'claudeFactory') credType = 'anthropic';
+    const credType = getCredentialProvider(selectedNode?.type);
     
     if (credType) {
       if (globalCredCache[credType]) {
@@ -162,7 +168,7 @@ export default function SidePanel({
   const data = selectedNode?.data || {};
 
   useEffect(() => {
-    if (data.credentialId && ['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode?.type)) {
+    if (data.credentialId && LLM_NODE_TYPES.includes(selectedNode?.type)) {
       if (data.model && !globalModelCache[data.credentialId]) {
         setDynamicModels([data.model]);
       }
@@ -241,7 +247,7 @@ export default function SidePanel({
 
   const handleInsertVariable = (path: string) => {
     const templateTag = `{{${path}}}`;
-    if (['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type)) {
+    if (LLM_NODE_TYPES.includes(selectedNode.type)) {
       const currentPrompt = selectedNode.data?.prompt || '';
       handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'httpRequest') {
@@ -257,10 +263,8 @@ export default function SidePanel({
     if (!newCredName || !newCredKey) return;
     setIsSavingCred(true);
     try {
-      let credType = '';
-      if (selectedNode.type === 'geminiFactory') credType = 'gemini';
-      if (selectedNode.type === 'chatgptFactory') credType = 'openai';
-      if (selectedNode.type === 'claudeFactory') credType = 'anthropic';
+      const credType = getCredentialProvider(selectedNode.type);
+      if (!credType) return;
       
       const res = await fetch('/api/credentials', {
         method: 'POST',
@@ -441,7 +445,7 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && (
+                    {LLM_NODE_TYPES.includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
@@ -501,7 +505,7 @@ export default function SidePanel({
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
                             <span>AI Model Version</span>
-                            {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && data.credentialId && (
+                            {LLM_NODE_TYPES.includes(selectedNode.type) && data.credentialId && (
                                <button 
                                  onClick={() => fetchModels(data.credentialId, true)}
                                  className="text-black hover:text-gray-700 transition-colors"
@@ -528,7 +532,7 @@ export default function SidePanel({
                               className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
                             >
                               <option value="">-- Select Model --</option>
-                              {['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(selectedNode.type) && (
+                              {LLM_NODE_TYPES.includes(selectedNode.type) && (
                                 dynamicModels.map(m => (
                                   <option key={m} value={m}>{m}</option>
                                 ))

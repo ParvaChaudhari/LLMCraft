@@ -1,16 +1,25 @@
 import { useState } from 'react';
 
-const toolAssets: Record<string, string> = {
-  webhook: 'webhook_tower.png',
-  httpRequest: 'http_request.png',
-  geminiFactory: 'gemini_factory.png',
-  chatgptFactory: 'chatgpt_factory.png',
-  claudeFactory: 'claude_factory.png',
-  conditional: 'conditional_road.png',
-  limit: 'limit_toll.png',
-  delay: 'delay_stop.png',
-  output: 'output_dock.png'
-};
+interface ToolItem {
+  type: string;
+  name: string;
+  icon: string;
+  description: string;
+  color: string;
+  asset: string;
+}
+
+const toolItems: ToolItem[] = [
+  { type: 'webhook',        name: 'Radio Tower',      icon: '[+]', description: 'Triggers the workflow',      color: '#4ade80', asset: 'webhook_tower.png' },
+  { type: 'httpRequest',    name: 'Data Center',      icon: '[*]', description: 'Make HTTP requests',         color: '#2dd4bf', asset: 'http_request.png' },
+  { type: 'geminiFactory',  name: 'Gemini Factory',   icon: '[~]', description: 'Process with Gemini AI',     color: '#60a5fa', asset: 'gemini_factory.png' },
+  { type: 'chatgptFactory', name: 'ChatGPT Factory',  icon: '[~]', description: 'Process with OpenAI',        color: '#74aa9c', asset: 'chatgpt_factory.png' },
+  { type: 'claudeFactory',  name: 'Claude Factory',   icon: '[~]', description: 'Process with Anthropic',     color: '#d97757', asset: 'claude_factory.png' },
+  { type: 'conditional',    name: 'Filter Gate',      icon: '[?]', description: 'If/Else Logic Gate',         color: '#facc15', asset: 'conditional_road.png' },
+  { type: 'limit',          name: 'Toll Booth',       icon: '[!]', description: 'Execution Limit Counter',    color: '#f87171', asset: 'limit_toll.png' },
+  { type: 'delay',          name: 'Truck Stop',       icon: '[-]', description: 'Wait for specified time',    color: '#d1d5db', asset: 'delay_stop.png' },
+  { type: 'output',         name: 'Delivery Dock',    icon: '[=]', description: 'Final output destination',   color: '#fb923c', asset: 'output_dock.png' },
+];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {
   const [selectedTool, setSelectedTool] = useState<string | null>(null);
@@ -80,144 +89,42 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
           <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Projects</h3>
         </div>
       <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
-        
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'webhook')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('webhook')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-green-400">[+] Radio Tower</div>
-          <div className="text-xs text-gray-400 mt-1">Triggers the workflow</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'httpRequest')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('httpRequest')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-teal-400">[*] Data Center</div>
-          <div className="text-xs text-gray-400 mt-1">Make HTTP requests</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'geminiFactory')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('geminiFactory')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-blue-400">[~] Gemini Factory</div>
-          <div className="text-xs text-gray-400 mt-1">Process with Gemini AI</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'chatgptFactory')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('chatgptFactory')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-[#74aa9c]">[~] ChatGPT Factory</div>
-          <div className="text-xs text-gray-400 mt-1">Process with OpenAI</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'claudeFactory')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('claudeFactory')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-[#d97757]">[~] Claude Factory</div>
-          <div className="text-xs text-gray-400 mt-1">Process with Anthropic</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'conditional')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('conditional')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-yellow-400">[?] Filter Gate</div>
-          <div className="text-xs text-gray-400 mt-1">If/Else Logic Gate</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'limit')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('limit')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-red-400">[!] Toll Booth</div>
-          <div className="text-xs text-gray-400 mt-1">Execution Limit Counter</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'delay')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('delay')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-gray-300">[-] Truck Stop</div>
-          <div className="text-xs text-gray-400 mt-1">Wait for specified time</div>
-        </div>
-
-        <div 
-          className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-          onDragStart={(event) => onDragStart(event, 'output')} 
-          onDragEnd={onDragEnd}
-          onMouseEnter={() => setSelectedTool('output')}
-          onMouseLeave={() => setSelectedTool(null)}
-          draggable
-        >
-          <div className="font-bold text-orange-400">[=] Delivery Dock</div>
-          <div className="text-xs text-gray-400 mt-1">Final output destination</div>
-        </div>
-
+        {toolItems.map(item => (
+          <div
+            key={item.type}
+            className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
+            style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
+            onDragStart={(event) => onDragStart(event, item.type)}
+            onDragEnd={onDragEnd}
+            onMouseEnter={() => setSelectedTool(item.type)}
+            onMouseLeave={() => setSelectedTool(null)}
+            draggable
+          >
+            <div className="font-bold" style={{ color: item.color }}>{item.icon} {item.name}</div>
+            <div className="text-xs text-gray-400 mt-1">{item.description}</div>
+          </div>
+        ))}
       </div>
 
       {/* Asset Preview Panel */}
-      {selectedTool && (
-        <div className="absolute top-0 left-[300px] z-20 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d] pointer-events-none" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
-          <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
-            <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Asset Preview</h3>
-          </div>
-          <div className="bg-[#2d2d2d] p-4 flex items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
-            {toolAssets[selectedTool] && (
+      {selectedTool && (() => {
+        const item = toolItems.find(t => t.type === selectedTool);
+        return item ? (
+          <div className="absolute top-0 left-[300px] z-20 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d] pointer-events-none" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
+            <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
+              <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Asset Preview</h3>
+            </div>
+            <div className="bg-[#2d2d2d] p-4 flex items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
               <img 
-                src={`/assets/${toolAssets[selectedTool]}`} 
-                alt={`${selectedTool} Preview`} 
+                src={`/assets/${item.asset}`} 
+                alt={`${item.name} Preview`} 
                 className="w-full object-contain" 
                 style={{ imageRendering: 'auto' }} 
               />
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        ) : null;
+      })()}
     </div>
     </div>
   );
