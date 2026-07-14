@@ -30,13 +30,13 @@ import DelayNode from './nodes/DelayNode';
 import SidePanel from './SidePanel';
 import Toolbox from './Toolbox';
 import SecretManager from './SecretManager';
+import WatchtowerNode from './nodes/WatchtowerNode';
+import CustomWorkshopNode from './nodes/CustomWorkshopNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
 import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
-
-import WatchtowerNode from './nodes/WatchtowerNode';
 
 const nodeTypes = {
   webhook: WebhookNode,
@@ -49,6 +49,7 @@ const nodeTypes = {
   limit: LimitNode,
   delay: DelayNode,
   watchtower: WatchtowerNode,
+  customWorkshop: CustomWorkshopNode,
 };
 
 const edgeTypes = {

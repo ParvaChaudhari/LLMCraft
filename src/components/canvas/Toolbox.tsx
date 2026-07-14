@@ -11,6 +11,7 @@ interface ToolItem {
 
 const toolItems: ToolItem[] = [
   { type: 'webhook',        name: 'Radio Tower',      icon: '[+]', description: 'Triggers the workflow',      color: '#4ade80', asset: 'webhook_tower.png' },
+  { type: 'customWorkshop', name: 'Custom Workshop',  icon: '[#]', description: 'Execute custom logic',      color: '#a78bfa', asset: 'custom_workshop.png' },
   { type: 'httpRequest',    name: 'Data Center',      icon: '[*]', description: 'Make HTTP requests',         color: '#2dd4bf', asset: 'http_request.png' },
   { type: 'geminiFactory',  name: 'Gemini Factory',   icon: '[~]', description: 'Process with Gemini AI',     color: '#60a5fa', asset: 'gemini_factory.png' },
   { type: 'chatgptFactory', name: 'ChatGPT Factory',  icon: '[~]', description: 'Process with OpenAI',        color: '#74aa9c', asset: 'chatgpt_factory.png' },

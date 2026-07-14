@@ -31,14 +31,14 @@ export default function RoadEdge({
     <g>
       {/* Invisible interaction path for hovering and clicking */}
       <path
-        d={motionPath}
+        d={motionPath as string}
         fill="none"
         style={{ stroke: selected ? "rgba(255, 255, 255, 0.5)" : "transparent", cursor: 'pointer' }}
         strokeWidth={32}
       />
 
       {/* Custom Truck Animator */}
-      {data?.isAnimating && points.length > 0 && (
+      {Boolean(data?.isAnimating) && points.length > 0 && (
         <TruckAnimator points={points} duration={2000} />
       )}
     </g>

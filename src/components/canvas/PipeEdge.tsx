@@ -18,13 +18,13 @@ export default function PipeEdge({
   const motionPath = tilesToMotionPath(points);
 
   // Faster pipeline animation
-  const isAnimating = data?.isAnimating;
+  const isAnimating = Boolean(data?.isAnimating);
 
   return (
     <g>
       {/* Invisible interaction path for hovering and clicking */}
       <path
-        d={motionPath}
+        d={motionPath as string}
         fill="none"
         style={{ stroke: "transparent", cursor: 'pointer' }}
         strokeWidth={32}
@@ -32,7 +32,7 @@ export default function PipeEdge({
 
       {/* Main Pipe Background (Metallic) */}
       <path
-        d={motionPath}
+        d={motionPath as string}
         fill="none"
         stroke={selected ? "#ffffff" : "#4b5563"} // gray-600
         strokeWidth={12}
@@ -45,7 +45,7 @@ export default function PipeEdge({
       
       {/* Pipe Inner Shadow / Highlight */}
       <path
-        d={motionPath}
+        d={motionPath as string}
         fill="none"
         stroke="#9ca3af" // gray-400
         strokeWidth={6}
@@ -56,7 +56,7 @@ export default function PipeEdge({
       {/* Flowing Data Animation */}
       {isAnimating && (
         <path
-          d={motionPath}
+          d={motionPath as string}
           fill="none"
           stroke="#06b6d4" // cyan-500
           strokeWidth={4}

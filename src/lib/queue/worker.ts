@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/client';
 import { decrypt } from '@/lib/crypto';
+import vm from 'vm';
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -10,7 +11,7 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 });
 
 // Create the Queue
-export const workflowQueue = new Queue('workflow-queue', { connection });
+export const workflowQueue = new Queue('workflow-queue', { connection: connection as any });
 
 // Helper to broadcast events via Redis Pub/Sub
 const broadcastEvent = async (workflowId: string, event: string, data: any) => {
@@ -312,6 +313,38 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'customWorkshop') {
+    const userCode = currentNode.data?.code || 'return context.lastOutput;';
+    console.log(`[Queue] Executing Custom Workshop code...`);
+
+    const sandbox = {
+      context: newContext,
+      console: {
+        log: (...args: any[]) => console.log(`[Workshop Log]`, ...args),
+        error: (...args: any[]) => console.error(`[Workshop Error]`, ...args),
+      }
+    };
+    vm.createContext(sandbox);
+
+    const scriptStr = `
+      (async () => {
+        ${userCode}
+      })();
+    `;
+
+    try {
+      const script = new vm.Script(scriptStr);
+      const result = await script.runInContext(sandbox, { timeout: 5000 });
+      
+      if (result !== undefined) {
+        newContext.lastOutput = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    } catch (err: any) {
+      console.error(`[Queue] Custom Workshop Error:`, err.message);
+      newContext.lastOutput = `Error: ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
@@ -412,7 +445,7 @@ if (global.__worker__) {
 }
 
 console.log('[Queue] Starting background worker...');
-global.__worker__ = new Worker('workflow-queue', executeNode, { connection, concurrency: 100 });
+global.__worker__ = new Worker('workflow-queue', executeNode, { connection: connection as any, concurrency: 100 });
 
 global.__worker__.on('completed', (job) => {
   // console.log(`[Queue] Job ${job.id} completed successfully`);

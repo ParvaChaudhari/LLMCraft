@@ -72,7 +72,8 @@ const toolAssets: Record<string, string> = {
   limit: 'limit_toll.png',
   delay: 'delay_stop.png',
   output: 'output_dock.png',
-  watchtower: 'watchtower.png'
+  watchtower: 'watchtower.png',
+  customWorkshop: 'custom_workshop.png',
 };
 
 export default function SidePanel({
@@ -624,6 +625,23 @@ export default function SidePanel({
                             onChange={(e) => handleChange('query', e.target.value)}
                             className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
                             placeholder="{{webhook.query}} or 'latest news'"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'customWorkshop' && (
+                      <div className="space-y-4">
+                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
+                          Write raw JavaScript. Use 'context' to read data. Must 'return' a value.
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">JavaScript Code</label>
+                          <textarea
+                            value={data.code !== undefined ? data.code : 'return context.lastOutput;'}
+                            onChange={(e) => handleChange('code', e.target.value)}
+                            className="w-full h-48 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            spellCheck={false}
                           />
                         </div>
                       </div>

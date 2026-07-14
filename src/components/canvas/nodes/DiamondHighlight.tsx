@@ -32,7 +32,7 @@ export default function DiamondHighlight({
   const originX = (rows * tileW) / 2;
   const originY = tileH / 2;
 
-  const diamonds: JSX.Element[] = [];
+  const diamonds: React.ReactNode[] = [];
 
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
