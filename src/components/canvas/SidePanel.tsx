@@ -10,6 +10,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'geminiFactory') return 'gemini';
   if (nodeType === 'chatgptFactory') return 'openai';
   if (nodeType === 'claudeFactory') return 'anthropic';
+  if (nodeType === 'watchtower') return 'tavily';
   return null;
 };
 
@@ -47,14 +48,16 @@ const JsonNode = ({ keyName, value, path, onInsert }: any) => {
   return (
     <div className="ml-4 my-1 flex items-start group font-mono text-sm relative pr-10">
       <span className="text-orange-400 font-bold mr-2 whitespace-nowrap">{keyName}:</span>
-      <span className="text-green-300 break-all">{String(value)}</span>
-      <button 
-        onClick={() => onInsert(path)}
-        className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 rounded-sm hover:bg-[#3ade1d] transition-opacity"
-        title="Insert Variable"
-      >
-        +
-      </button>
+      <span className="text-green-300 break-words">{String(value)}</span>
+      {onInsert && (
+        <button 
+          onClick={() => onInsert(path)}
+          className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 rounded-sm hover:bg-[#3ade1d] transition-opacity"
+          title="Insert Variable"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 };
@@ -68,7 +71,8 @@ const toolAssets: Record<string, string> = {
   conditional: 'conditional_road.png',
   limit: 'limit_toll.png',
   delay: 'delay_stop.png',
-  output: 'output_dock.png'
+  output: 'output_dock.png',
+  watchtower: 'watchtower.png'
 };
 
 export default function SidePanel({
@@ -95,6 +99,7 @@ export default function SidePanel({
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isNodeRunning, setIsNodeRunning] = useState(false);
+  const [viewAsJson, setViewAsJson] = useState(false);
   const nodeEventSourceRef = useRef<EventSource | null>(null);
 
   const toggleTab = (tabId: string) => {
@@ -445,7 +450,7 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {LLM_NODE_TYPES.includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
@@ -502,7 +507,9 @@ export default function SidePanel({
                             </div>
                           )}
                         </div>
-                        <div>
+                        {LLM_NODE_TYPES.includes(selectedNode.type) && (
+                          <>
+                            <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
                             <span>AI Model Version</span>
                             {LLM_NODE_TYPES.includes(selectedNode.type) && data.credentialId && (
@@ -549,6 +556,8 @@ export default function SidePanel({
                             placeholder="Summarize this: {{lastOutput}}"
                           />
                         </div>
+                      </>
+                    )}
                       </>
                     )}
 
@@ -600,6 +609,24 @@ export default function SidePanel({
                           />
                         </div>
                       </>
+                    )}
+
+                    {selectedNode.type === 'watchtower' && (
+                      <div className="space-y-4">
+                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
+                          Watchtower uses the Tavily API to search the web and return context.
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Search Query</label>
+                          <input
+                            type="text"
+                            value={data.query || ''}
+                            onChange={(e) => handleChange('query', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="{{webhook.query}} or 'latest news'"
+                          />
+                        </div>
+                      </div>
                     )}
 
                     {selectedNode.type === 'delay' && (
@@ -691,7 +718,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}
@@ -731,17 +758,65 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Logs</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto">
-                    <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col">
-                      <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between">
+                    <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col relative">
+                      <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between items-center">
                         <span>SYSTEM OUTPUT</span>
-                        <span className="text-gray-500">READY</span>
+                        <div className="flex items-center gap-4">
+                          {data.output && (
+                            <button
+                              onClick={() => setViewAsJson(!viewAsJson)}
+                              className={`px-3 py-1 text-[10px] font-bold border-2 transition-colors ${
+                                viewAsJson 
+                                  ? 'bg-[#4af626] text-black border-[#4af626]' 
+                                  : 'bg-transparent text-gray-400 border-gray-600 hover:text-white hover:border-gray-400'
+                              }`}
+                            >
+                              JSON
+                            </button>
+                          )}
+                          <span className="text-gray-500">READY</span>
+                        </div>
                       </div>
                       {data.output ? (
-                        <textarea 
-                          readOnly 
-                          className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
-                          value={data.output}
-                        />
+                        viewAsJson ? (() => {
+                          let parsedJson = null;
+                          try {
+                            let cleanData = data.output;
+                            const match = cleanData.match(/```(?:json)?\n([\s\S]*?)\n```/);
+                            if (match) cleanData = match[1].trim();
+                            parsedJson = JSON.parse(cleanData);
+                          } catch (e) {
+                            // Invalid JSON
+                          }
+                          
+                          if (parsedJson && typeof parsedJson === 'object') {
+                            return (
+                              <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                                {Object.entries(parsedJson).map(([k, v]) => (
+                                  <JsonNode 
+                                    key={k} 
+                                    keyName={k} 
+                                    value={v} 
+                                    path={k} 
+                                  />
+                                ))}
+                              </div>
+                            );
+                          } else {
+                            return (
+                              <div className="flex-1 flex items-center justify-center flex-col text-red-500 font-mono text-sm">
+                                <div>Invalid JSON Format</div>
+                                <button onClick={() => setViewAsJson(false)} className="mt-2 text-gray-400 underline hover:text-white">Return to RAW text</button>
+                              </div>
+                            );
+                          }
+                        })() : (
+                          <textarea 
+                            readOnly 
+                            className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
+                            value={data.output}
+                          />
+                        )
                       ) : (
                         <div className="flex-1 flex items-center justify-center flex-col text-gray-600 font-mono text-sm">
                           <div className="animate-bounce mb-2">_</div>

@@ -36,6 +36,8 @@ import PipeEdge from './PipeEdge';
 import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
+import WatchtowerNode from './nodes/WatchtowerNode';
+
 const nodeTypes = {
   webhook: WebhookNode,
   geminiFactory: GeminiFactoryNode,
@@ -46,6 +48,7 @@ const nodeTypes = {
   conditional: ConditionalNode,
   limit: LimitNode,
   delay: DelayNode,
+  watchtower: WatchtowerNode,
 };
 
 const edgeTypes = {

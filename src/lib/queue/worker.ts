@@ -252,12 +252,65 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Making real HTTP ${method} request to ${url}...`);
     try {
       const res = await fetch(url, options);
-      const data = await res.text();
+      let data = await res.text();
+      try {
+        data = JSON.stringify(JSON.parse(data), null, 2);
+      } catch (e) {
+        // Keep as raw text if it's not valid JSON
+      }
       newContext.lastOutput = data;
       newContext[nodeId] = data;
     } catch (err: any) {
       console.error(`[Queue] HTTP Error:`, err.message);
       newContext.lastOutput = `Error: ${err.message}`;
+    }
+  } else if (currentNode.type === 'watchtower') {
+    const rawQuery = currentNode.data?.query || '{{lastOutput}}';
+    const query = replaceVariables(rawQuery, newContext);
+    const apiKey = await fetchApiKey(currentNode.data?.credentialId);
+
+    if (!apiKey) {
+      newContext.lastOutput = `Error: Missing Tavily API Key`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      console.log(`[Queue] Watchtower searching Tavily for: ${query}`);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
+        const res = await fetch('https://api.tavily.com/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: apiKey,
+            query: query,
+            search_depth: "advanced",
+            include_answer: "basic",
+            max_results: 5
+          }),
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Tavily API Error');
+        
+        const formattedOutput = {
+          summary: data.answer || "No search results found.",
+          sources: (data.results || []).map((r: any) => ({
+            url: r.url,
+            content: r.content
+          }))
+        };
+        const output = JSON.stringify(formattedOutput, null, 2);
+
+        newContext.lastOutput = output;
+        newContext[nodeId] = output;
+      } catch (err: any) {
+        console.error(`[Queue] Watchtower Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
     }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
