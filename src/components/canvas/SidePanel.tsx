@@ -74,6 +74,7 @@ const toolAssets: Record<string, string> = {
   output: 'output_dock.png',
   watchtower: 'watchtower.png',
   customWorkshop: 'custom_workshop.png',
+  webScraper: 'print_shop.png',
 };
 
 export default function SidePanel({
@@ -647,6 +648,24 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'webScraper' && (
+                      <div className="space-y-4">
+                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
+                          The Print Shop scrapes raw text from a webpage URL.
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Target URL</label>
+                          <input
+                            type="text"
+                            value={data.url || ''}
+                            onChange={(e) => handleChange('url', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="https://example.com or {{webhook.url}}"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {selectedNode.type === 'delay' && (
                       <div>
                         <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Wait Duration (ms)</label>
@@ -736,7 +755,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

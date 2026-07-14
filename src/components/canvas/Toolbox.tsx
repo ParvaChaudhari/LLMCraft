@@ -21,6 +21,7 @@ const toolItems: ToolItem[] = [
   { type: 'delay',          name: 'Truck Stop',       icon: '[-]', description: 'Wait for specified time',    color: '#d1d5db', asset: 'delay_stop.png' },
   { type: 'output',         name: 'Delivery Dock',    icon: '[=]', description: 'Final output destination',   color: '#fb923c', asset: 'output_dock.png' },
   { type: 'watchtower',     name: 'Watchtower',       icon: '[O]', description: 'Web Search (Tavily)',        color: '#818cf8', asset: 'watchtower.png' },
+  { type: 'webScraper',     name: 'Print Shop',       icon: '[P]', description: 'Web Scraper',                color: '#3b82f6', asset: 'print_shop.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

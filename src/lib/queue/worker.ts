@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/client';
 import { decrypt } from '@/lib/crypto';
 import vm from 'vm';
+import * as cheerio from 'cheerio';
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -344,6 +345,42 @@ const executeNode = async (job: Job) => {
       console.error(`[Queue] Custom Workshop Error:`, err.message);
       newContext.lastOutput = `Error: ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
+    }
+  } else if (currentNode.type === 'webScraper') {
+    const rawUrl = currentNode.data?.url || '';
+    const url = replaceVariables(rawUrl, newContext);
+    console.log(`[Queue] Print Shop scraping URL: ${url}`);
+    
+    if (!url) {
+      newContext.lastOutput = `Error: Missing URL for Print Shop.`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        
+        // Remove non-text elements
+        $('script, style, noscript, iframe, img, svg').remove();
+        
+        // Extract raw text and clean whitespace
+        const rawText = $('body').text() || $.text();
+        let cleanText = rawText.replace(/\s+/g, ' ').trim();
+        
+        // Prevent massive payloads from crashing SSE/Redis
+        if (cleanText.length > 30000) {
+          cleanText = cleanText.substring(0, 30000) + '\n\n... (Content truncated due to length)';
+        }
+        
+        newContext.lastOutput = cleanText;
+        newContext[nodeId] = cleanText;
+      } catch (err: any) {
+        console.error(`[Queue] Print Shop Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
     }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);

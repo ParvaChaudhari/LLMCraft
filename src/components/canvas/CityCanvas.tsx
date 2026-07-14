@@ -32,6 +32,7 @@ import Toolbox from './Toolbox';
 import SecretManager from './SecretManager';
 import WatchtowerNode from './nodes/WatchtowerNode';
 import CustomWorkshopNode from './nodes/CustomWorkshopNode';
+import PrintShopNode from './nodes/PrintShopNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -50,6 +51,7 @@ const nodeTypes = {
   delay: DelayNode,
   watchtower: WatchtowerNode,
   customWorkshop: CustomWorkshopNode,
+  webScraper: PrintShopNode,
 };
 
 const edgeTypes = {
