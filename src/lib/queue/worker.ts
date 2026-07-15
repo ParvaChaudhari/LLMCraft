@@ -5,6 +5,8 @@ import { createClient } from '@/lib/supabase/client';
 import { decrypt } from '@/lib/crypto';
 import vm from 'vm';
 import * as cheerio from 'cheerio';
+import fs from 'fs';
+import path from 'path';
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -378,6 +380,53 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = cleanText;
       } catch (err: any) {
         console.error(`[Queue] Print Shop Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
+  } else if (currentNode.type === 'documentParser') {
+    const filePath = currentNode.data?.filePath;
+    console.log(`[Queue] Library parsing file: ${filePath}`);
+    
+    if (!filePath) {
+      newContext.lastOutput = `Error: No file uploaded for Library node.`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const urlObj = new URL(filePath);
+        const ext = path.extname(urlObj.pathname).toLowerCase();
+        
+        const response = await fetch(filePath);
+        if (!response.ok) {
+          throw new Error(`Failed to download file from storage (HTTP ${response.status})`);
+        }
+        
+        const arrayBuffer = await response.arrayBuffer();
+        const dataBuffer = Buffer.from(arrayBuffer);
+        let extractedText = '';
+        
+        if (ext === '.pdf') {
+          const pdfParse = require('pdf-parse/lib/pdf-parse.js');
+          const pdfData = await pdfParse(dataBuffer);
+          extractedText = pdfData.text;
+        } else if (ext === '.txt' || ext === '.csv') {
+          extractedText = dataBuffer.toString('utf-8');
+        } else {
+          throw new Error(`Unsupported file type: ${ext}`);
+        }
+        
+        let cleanText = extractedText.replace(/\s+/g, ' ').trim();
+        
+        if (!cleanText) {
+          cleanText = "[NO EXTRACTABLE TEXT FOUND] This document appears to be a scanned image or contains no selectable text layer.";
+        } else if (cleanText.length > 30000) {
+          cleanText = cleanText.substring(0, 30000) + '\n\n... (Content truncated due to length)';
+        }
+        
+        newContext.lastOutput = cleanText;
+        newContext[nodeId] = cleanText;
+      } catch (err: any) {
+        console.error(`[Queue] Library Error:`, err.message);
         newContext.lastOutput = `Error: ${err.message}`;
         newContext[nodeId] = newContext.lastOutput;
       }

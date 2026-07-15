@@ -666,6 +666,69 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'documentParser' && (
+                      <div className="space-y-4">
+                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
+                          Upload a PDF, CSV, or TXT file to extract text.
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Document File</label>
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept=".pdf,.csv,.txt"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                try {
+                                  updateNodeData(selectedNode.id, { isUploading: true, uploadError: null });
+                                  
+                                  // Clean up old file if it exists
+                                  if (data.filePath) {
+                                    await fetch('/api/upload', {
+                                      method: 'DELETE',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ fileUrl: data.filePath }),
+                                    }).catch((err) => console.error('Failed to delete old file:', err));
+                                  }
+
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                  if (!res.ok) throw new Error('Upload failed');
+                                  const json = await res.json();
+                                  updateNodeData(selectedNode.id, { filePath: json.filePath, fileName: json.fileName, isUploading: false });
+                                } catch (err: any) {
+                                  updateNodeData(selectedNode.id, { uploadError: err.message, isUploading: false });
+                                }
+                              }}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
+                            <div className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] text-center font-bold uppercase transition-colors hover:bg-[#2d2d2d] flex items-center justify-center gap-2">
+                              {data.isUploading ? (
+                                <>
+                                  <div className="w-4 h-4 border-2 border-[#4af626] border-t-transparent rounded-full animate-spin" />
+                                  Uploading...
+                                </>
+                              ) : (
+                                'Choose File'
+                              )}
+                            </div>
+                          </div>
+                          {data.fileName && (
+                            <div className="mt-2 text-xs font-bold text-[#1a1a1a] bg-[#d8c8b8] p-2 border-[2px] border-[#2d2d2d] truncate">
+                              Selected: {data.fileName}
+                            </div>
+                          )}
+                          {data.uploadError && (
+                            <div className="mt-2 text-xs font-bold text-red-500">
+                              {data.uploadError}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedNode.type === 'delay' && (
                       <div>
                         <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Wait Duration (ms)</label>
@@ -755,7 +818,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

@@ -1,0 +1,26 @@
+import { Handle, Position } from '@xyflow/react';
+import DiamondHighlight from './DiamondHighlight';
+import NodeControls from './NodeControls';
+
+export default function LibraryNode({ id, data, selected }: { id: string, data: any, selected?: boolean }) {
+  const isExecuting = data?.isLoading;
+
+  return (
+    <div className="relative group" style={{ width: 192, height: 105 }}>
+      <NodeControls id={id} data={data} showPin label="Library" />
+      {selected && <DiamondHighlight cols={3} rows={3} />}
+
+      <Handle type="target" position={Position.Left} className="w-2 h-2 bg-yellow-600 border-none rounded-full z-10" style={{ left: 48, top: 64 }} />
+
+      <div className="absolute pointer-events-none" style={{ left: 0, bottom: -50, width: '100%', height: 300, transformOrigin: 'bottom center' }}>
+        <img src="/assets/library.png" alt="Library" className="w-full h-full object-contain" />
+
+        {isExecuting && (
+          <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-20 h-20 bg-yellow-300 opacity-40 rounded-full blur-xl animate-pulse pointer-events-none z-10"></div>
+        )}
+      </div>
+
+      <Handle type="source" position={Position.Right} className="w-2 h-2 bg-yellow-600 border-none rounded-full z-10" style={{ right: 48, top: 64 }} />
+    </div>
+  );
+}

@@ -14,6 +14,7 @@ import {
   OnNodesChange,
   OnEdgesChange,
   OnConnect,
+  Connection,
   ReactFlowInstance,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -33,6 +34,7 @@ import SecretManager from './SecretManager';
 import WatchtowerNode from './nodes/WatchtowerNode';
 import CustomWorkshopNode from './nodes/CustomWorkshopNode';
 import PrintShopNode from './nodes/PrintShopNode';
+import LibraryNode from './nodes/LibraryNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -52,6 +54,7 @@ const nodeTypes = {
   watchtower: WatchtowerNode,
   customWorkshop: CustomWorkshopNode,
   webScraper: PrintShopNode,
+  documentParser: LibraryNode,
 };
 
 const edgeTypes = {
@@ -212,8 +215,23 @@ export default function CityCanvas() {
     []
   );
 
-  const onConnect: OnConnect = useCallback(
-    (params) => setEdges((eds) => addEdge(params, eds)),
+  const onConnect = useCallback(
+    (params: Connection) => setEdges((eds) => addEdge({ ...params, type: 'road' }, eds)),
+    [setEdges]
+  );
+
+  const onNodesDelete = useCallback(
+    (deletedNodes: Node[]) => {
+      deletedNodes.forEach((node) => {
+        if (node.type === 'documentParser' && node.data?.filePath) {
+          fetch('/api/upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fileUrl: node.data.filePath }),
+          }).catch((err) => console.error('Failed to delete associated file:', err));
+        }
+      });
+    },
     []
   );
 
@@ -377,6 +395,7 @@ export default function CityCanvas() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onNodesDelete={onNodesDelete}
           onInit={setReactFlowInstance}
           onNodeClick={onNodeClick}
           onEdgeClick={(event, edge) => setEdges((eds) => eds.filter((e) => e.id !== edge.id))}
