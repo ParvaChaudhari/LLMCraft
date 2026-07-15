@@ -11,6 +11,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'chatgptFactory') return 'openai';
   if (nodeType === 'claudeFactory') return 'anthropic';
   if (nodeType === 'watchtower') return 'tavily';
+  if (nodeType === 'dbSilo') return 'postgres';
   return null;
 };
 
@@ -75,6 +76,8 @@ const toolAssets: Record<string, string> = {
   watchtower: 'watchtower.png',
   customWorkshop: 'custom_workshop.png',
   webScraper: 'print_shop.png',
+  documentParser: 'library.png',
+  dbSilo: 'db_silo.png',
 };
 
 export default function SidePanel({
@@ -263,6 +266,9 @@ export default function SidePanel({
     } else if (selectedNode.type === 'conditional') {
       const currentMatch = selectedNode.data?.conditionLhs || '';
       handleChange('conditionLhs', currentMatch + (currentMatch ? ' ' : '') + templateTag);
+    } else if (selectedNode.type === 'dbSilo') {
+      const currentQuery = selectedNode.data?.query || '';
+      handleChange('query', currentQuery + (currentQuery ? ' ' : '') + templateTag);
     }
   };
 
@@ -452,7 +458,7 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
@@ -486,16 +492,20 @@ export default function SidePanel({
                                   value={newCredName}
                                   onChange={(e) => setNewCredName(e.target.value)}
                                   placeholder="e.g. My Personal API Key"
+                                  autoComplete="off"
                                   className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-400">API Key</label>
+                                <label className="block text-xs font-bold mb-1 text-gray-400">
+                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : 'API Key'}
+                                </label>
                                 <input
                                   type="password"
                                   value={newCredKey}
                                   onChange={(e) => setNewCredKey(e.target.value)}
-                                  placeholder="sk-..."
+                                  placeholder={getCredentialProvider(selectedNode.type) === 'postgres' ? "postgresql://user:password@host/db" : "sk-..."}
+                                  autoComplete="new-password"
                                   className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
                                 />
                               </div>
@@ -631,6 +641,18 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'dbSilo' && (
+                      <div className="space-y-2">
+                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">SQL Query (Supports {"{{"}variable{"}}"} interpolation)</label>
+                        <textarea
+                          value={data.query || ''}
+                          onChange={(e) => handleChange('query', e.target.value)}
+                          className="w-full h-32 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono text-sm resize-y outline-none"
+                          placeholder="SELECT * FROM users WHERE email = '{{lastOutput}}';"
+                        />
+                      </div>
+                    )}
+
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
@@ -668,8 +690,9 @@ export default function SidePanel({
 
                     {selectedNode.type === 'documentParser' && (
                       <div className="space-y-4">
-                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
-                          Upload a PDF, CSV, or TXT file to extract text.
+                        <div className="p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] rounded-md text-sm text-gray-300">
+                          <p className="mb-2">The Library accepts file uploads and extracts their raw text during execution.</p>
+                          <p>Currently supported: <strong>.pdf</strong>, <strong>.csv</strong>, <strong>.txt</strong></p>
                         </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Document File</label>
@@ -818,7 +841,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

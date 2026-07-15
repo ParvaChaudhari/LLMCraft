@@ -24,6 +24,7 @@ const toolItems: ToolItem[] = [
   { type: 'watchtower',     name: 'Watchtower',       icon: '[O]', description: 'Web Search (Tavily)',        longDescription: 'Perform an advanced web search using Tavily AI to pull real-time information and sources directly into your workflow.', color: '#818cf8', asset: 'watchtower.png' },
   { type: 'webScraper',     name: 'Print Shop',       icon: '[P]', description: 'Web Scraper',                longDescription: 'Scrape the raw HTML from any given URL, strip out the code tags, and extract the clean, readable text.', color: '#3b82f6', asset: 'print_shop.png' },
   { type: 'documentParser', name: 'Library',          icon: '[L]', description: 'Document Parser',            longDescription: 'Extract raw text from PDF, CSV, and TXT files. Upload documents directly into your workflow for AI processing.', color: '#ca8a04', asset: 'library.png' },
+  { type: 'dbSilo',         name: 'DB Silo',          icon: '[D]', description: 'Postgres Connector',         longDescription: 'Connect to remote Postgres databases and run raw SQL queries directly in the pipeline.', color: '#06b6d4', asset: 'db_silo.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

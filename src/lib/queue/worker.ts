@@ -431,6 +431,42 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'dbSilo') {
+    const credentialId = currentNode.data?.credentialId;
+    const rawQuery = currentNode.data?.query || '';
+    
+    if (!credentialId) {
+      newContext.lastOutput = `Error: No Postgres credential selected.`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else if (!rawQuery) {
+      newContext.lastOutput = `Error: No SQL query provided.`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const connectionString = await fetchApiKey(credentialId);
+        if (!connectionString) throw new Error('Credential not found or decryption failed.');
+        
+        const interpolatedQuery = replaceVariables(rawQuery, newContext);
+        
+        console.log(`[Queue] DB Silo connecting and executing: ${interpolatedQuery.substring(0, 50)}...`);
+        
+        const { Client } = require('pg');
+        const client = new Client({ connectionString });
+        await client.connect();
+        
+        const res = await client.query(interpolatedQuery);
+        await client.end();
+        
+        const resultString = JSON.stringify(res.rows, null, 2);
+        
+        newContext.lastOutput = resultString;
+        newContext[nodeId] = resultString;
+      } catch (err: any) {
+        console.error(`[Queue] DB Silo Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
