@@ -36,6 +36,7 @@ import CustomWorkshopNode from './nodes/CustomWorkshopNode';
 import PrintShopNode from './nodes/PrintShopNode';
 import LibraryNode from './nodes/LibraryNode';
 import DBSiloNode from './nodes/DBSiloNode';
+import SortingFacilityNode from './nodes/SortingFacilityNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -57,6 +58,7 @@ const nodeTypes = {
   webScraper: PrintShopNode,
   documentParser: LibraryNode,
   dbSilo: DBSiloNode,
+  jsonParser: SortingFacilityNode,
 };
 
 const edgeTypes = {

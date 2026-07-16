@@ -12,12 +12,16 @@ export default function DiamondHighlight({
   rows = 3,
   color = 'rgba(200, 255, 0, 0.25)',
   strokeColor = 'rgba(200, 255, 0, 1)',
+  offsetX = 0,
+  offsetY = 0,
   style = {},
 }: {
   cols?: number;
   rows?: number;
   color?: string;
   strokeColor?: string;
+  offsetX?: number;
+  offsetY?: number;
   style?: React.CSSProperties;
 }) {
   // Each diamond tile is 64px wide × 32px tall in flow-space
@@ -63,8 +67,13 @@ export default function DiamondHighlight({
 
   return (
     <svg
-      className="absolute inset-0 pointer-events-none z-0"
-      style={{ filter: 'drop-shadow(0px 0px 8px rgba(200, 255, 0, 0.8))', ...style }}
+      className="absolute pointer-events-none z-0"
+      style={{ 
+        left: offsetX,
+        top: offsetY,
+        filter: 'drop-shadow(0px 0px 8px rgba(200, 255, 0, 0.8))', 
+        ...style 
+      }}
       width={nodeW}
       height={nodeH}
       viewBox={`0 0 ${nodeW} ${nodeH}`}

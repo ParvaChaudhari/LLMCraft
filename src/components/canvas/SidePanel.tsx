@@ -78,6 +78,7 @@ const toolAssets: Record<string, string> = {
   webScraper: 'print_shop.png',
   documentParser: 'library.png',
   dbSilo: 'db_silo.png',
+  jsonParser: 'sorting_facility.png',
 };
 
 export default function SidePanel({
@@ -653,6 +654,15 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'jsonParser' && (
+                      <div className="space-y-4">
+                        <div className="p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] rounded-md text-sm text-gray-300">
+                          <p className="mb-2">The Sorting Facility acts as a structural validation checkpoint.</p>
+                          <p>It automatically extracts the first valid JSON block from the incoming string, verifies it using standard JSON parsing, and outputs the clean object downstream. If the incoming text contains no valid JSON, the workflow halts with an error.</p>
+                        </div>
+                      </div>
+                    )}
+
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
@@ -841,7 +851,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

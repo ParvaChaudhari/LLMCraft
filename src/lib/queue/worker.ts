@@ -467,6 +467,47 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'jsonParser') {
+    const rawInput = newContext.lastOutput;
+    if (!rawInput) {
+      newContext.lastOutput = `Error: Sorting Facility received empty input.`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        console.log(`[Queue] Sorting Facility processing input...`);
+        let extracted = null;
+        
+        // Find the first occurrence of {...} or [...]
+        const objectMatch = rawInput.match(/\{[\s\S]*\}/);
+        const arrayMatch = rawInput.match(/\[[\s\S]*\]/);
+        
+        if (objectMatch && arrayMatch) {
+          // If both exist, take whichever comes first
+          extracted = objectMatch.index < arrayMatch.index ? objectMatch[0] : arrayMatch[0];
+        } else if (objectMatch) {
+          extracted = objectMatch[0];
+        } else if (arrayMatch) {
+          extracted = arrayMatch[0];
+        }
+
+        if (!extracted) {
+          throw new Error('No JSON structure found in the input text.');
+        }
+
+        // Validate by parsing
+        const parsed = JSON.parse(extracted);
+        
+        // Re-stringify with pretty formatting to guarantee clean output
+        const cleanJson = JSON.stringify(parsed, null, 2);
+        
+        newContext.lastOutput = cleanJson;
+        newContext[nodeId] = cleanJson;
+      } catch (err: any) {
+        console.error(`[Queue] Sorting Facility Error:`, err.message);
+        newContext.lastOutput = `Error (Invalid JSON): ${err.message}\n\nRaw Input was:\n${rawInput}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
