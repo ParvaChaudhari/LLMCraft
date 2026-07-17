@@ -12,6 +12,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'claudeFactory') return 'anthropic';
   if (nodeType === 'watchtower') return 'tavily';
   if (nodeType === 'dbSilo') return 'postgres';
+  if (nodeType === 'apify') return 'apify';
   return null;
 };
 
@@ -79,6 +80,7 @@ const toolAssets: Record<string, string> = {
   documentParser: 'library.png',
   dbSilo: 'db_silo.png',
   jsonParser: 'sorting_facility.png',
+  apify: 'drone_hub.png',
 };
 
 export default function SidePanel({
@@ -207,26 +209,14 @@ export default function SidePanel({
     // Build context from upstream pinned/previous outputs
     const context = buildNodeContext(selectedNode.id, nodes, edges);
 
+    // Generate workflowId client-side so we can connect SSE BEFORE queuing the job.
+    // This prevents a race condition where fast nodes (like Custom Workshop) finish
+    // before the EventSource is even connected.
+    const workflowId = `node-exec-${Date.now()}`;
+
     try {
-      const res = await fetch('/api/execute-node', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodeId: selectedNode.id, nodes, edges, context }),
-      });
-
-      let resData;
-      const rawText = await res.text();
-      try {
-        resData = JSON.parse(rawText);
-      } catch (e) {
-        console.error('Failed to parse response as JSON. Raw response:', rawText);
-        throw new Error(`Server returned invalid JSON (Status: ${res.status})`);
-      }
-
-      if (!res.ok) throw new Error(resData.error || 'Failed to execute node');
-      if (!resData.workflowId) throw new Error('No workflowId returned');
-
-      const es = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
+      // 1. Connect SSE FIRST
+      const es = new EventSource(`/api/events?workflowId=${workflowId}`);
       nodeEventSourceRef.current = es;
 
       es.onmessage = (event) => {
@@ -250,6 +240,26 @@ export default function SidePanel({
         updateNodeData(selectedNode.id, { isLoading: false });
         es.close();
       };
+
+      // 2. Wait a tick for SSE to connect, THEN queue the job
+      await new Promise(r => setTimeout(r, 300));
+
+      const res = await fetch('/api/execute-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: selectedNode.id, nodes, edges, context, workflowId }),
+      });
+
+      let resData;
+      const rawText = await res.text();
+      try {
+        resData = JSON.parse(rawText);
+      } catch (e) {
+        console.error('Failed to parse response as JSON. Raw response:', rawText);
+        throw new Error(`Server returned invalid JSON (Status: ${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(resData.error || 'Failed to execute node');
     } catch (err) {
       setIsNodeRunning(false);
       updateNodeData(selectedNode.id, { isLoading: false });
@@ -459,7 +469,7 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
@@ -663,6 +673,30 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'apify' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Actor ID</label>
+                          <input
+                            type="text"
+                            value={data.actorId || ''}
+                            onChange={(e) => handleChange('actorId', e.target.value)}
+                            className="w-full p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono outline-none"
+                            placeholder="e.g. apify/instagram-scraper"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">JSON Input Payload</label>
+                          <textarea
+                            value={data.payload || ''}
+                            onChange={(e) => handleChange('payload', e.target.value)}
+                            className="w-full h-40 p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono text-sm resize-y outline-none"
+                            placeholder='{&#10;  "searchTerms": ["{{lastOutput}}"]&#10;}'
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
@@ -851,7 +885,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

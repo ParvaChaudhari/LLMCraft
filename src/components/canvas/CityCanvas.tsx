@@ -37,6 +37,7 @@ import PrintShopNode from './nodes/PrintShopNode';
 import LibraryNode from './nodes/LibraryNode';
 import DBSiloNode from './nodes/DBSiloNode';
 import SortingFacilityNode from './nodes/SortingFacilityNode';
+import ApifyNode from './nodes/ApifyNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -59,6 +60,7 @@ const nodeTypes = {
   documentParser: LibraryNode,
   dbSilo: DBSiloNode,
   jsonParser: SortingFacilityNode,
+  apify: ApifyNode,
 };
 
 const edgeTypes = {

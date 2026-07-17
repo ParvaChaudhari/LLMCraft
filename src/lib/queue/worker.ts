@@ -3,7 +3,6 @@ import IORedis from 'ioredis';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@/lib/supabase/client';
 import { decrypt } from '@/lib/crypto';
-import vm from 'vm';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
@@ -318,27 +317,33 @@ const executeNode = async (job: Job) => {
     }
   } else if (currentNode.type === 'customWorkshop') {
     const userCode = currentNode.data?.code || 'return context.lastOutput;';
-    console.log(`[Queue] Executing Custom Workshop code...`);
-
-    const sandbox = {
-      context: newContext,
-      console: {
-        log: (...args: any[]) => console.log(`[Workshop Log]`, ...args),
-        error: (...args: any[]) => console.error(`[Workshop Error]`, ...args),
-      }
-    };
-    vm.createContext(sandbox);
-
-    const scriptStr = `
-      (async () => {
-        ${userCode}
-      })();
-    `;
 
     try {
-      const script = new vm.Script(scriptStr);
-      const result = await script.runInContext(sandbox, { timeout: 5000 });
-      
+      const workshopFn = new Function('context', 'console', `
+        return (async () => {
+          ${userCode}
+        })();
+      `);
+
+      const workshopConsole = {
+        log: (...args: any[]) => console.log(`[Workshop Log]`, ...args),
+        error: (...args: any[]) => console.error(`[Workshop Error]`, ...args),
+      };
+
+      const fnResult = workshopFn(newContext, workshopConsole);
+
+      let timeoutHandle: any;
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error('Workshop timed out after 5000ms'));
+        }, 5000);
+      });
+
+      const result = await Promise.race([
+        Promise.resolve(fnResult).finally(() => clearTimeout(timeoutHandle)),
+        timeoutPromise
+      ]);
+
       if (result !== undefined) {
         newContext.lastOutput = typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result);
         newContext[nodeId] = newContext.lastOutput;
@@ -467,6 +472,71 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'apify') {
+    const { credentialId, actorId, payload } = currentNode.data;
+    if (!credentialId || !actorId) {
+      newContext.lastOutput = 'Error: Apify Node is missing credential or Actor ID.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const apifyToken = await fetchApiKey(credentialId);
+        if (!apifyToken) throw new Error('Apify token not found.');
+
+        let finalPayloadStr = payload || '{}';
+        finalPayloadStr = replaceVariables(finalPayloadStr, newContext);
+        const finalPayloadObj = JSON.parse(finalPayloadStr);
+
+        console.log(`[Queue] Triggering Apify Actor ${actorId}...`);
+        
+        // 1. Start the run
+        const formattedActorId = actorId.replace('/', '~');
+        const encodedActorId = encodeURIComponent(formattedActorId);
+        const runRes = await fetch(`https://api.apify.com/v2/acts/${encodedActorId}/runs?token=${apifyToken}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(finalPayloadObj)
+        });
+        
+        if (!runRes.ok) {
+          const errText = await runRes.text();
+          throw new Error(`Apify failed to start run: ${errText}`);
+        }
+        
+        const runData = await runRes.json();
+        const runId = runData.data.id;
+        console.log(`[Queue] Apify Run Started: ${runId}. Polling for completion...`);
+
+        // 2. Poll for completion
+        let status = runData.data.status;
+        while (status === 'READY' || status === 'RUNNING') {
+          // Wait 3 seconds
+          await new Promise(r => setTimeout(r, 3000));
+          
+          const pollRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+          const pollData = await pollRes.json();
+          status = pollData.data.status;
+          console.log(`[Queue] Apify Run ${runId} Status: ${status}`);
+        }
+
+        if (status !== 'SUCCEEDED') {
+          throw new Error(`Apify Run failed with status: ${status}`);
+        }
+
+        // 3. Fetch Dataset
+        console.log(`[Queue] Apify Run Succeeded. Fetching dataset...`);
+        const datasetId = runData.data.defaultDatasetId; // Can also fetch from pollData
+        const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}`);
+        const datasetItems = await datasetRes.json();
+
+        const jsonOutput = JSON.stringify(datasetItems, null, 2);
+        newContext.lastOutput = jsonOutput;
+        newContext[nodeId] = jsonOutput;
+      } catch (err: any) {
+        console.error(`[Queue] Apify Error:`, err.message);
+        newContext.lastOutput = `Error (Apify): ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'jsonParser') {
     const rawInput = newContext.lastOutput;
     if (!rawInput) {
@@ -552,7 +622,6 @@ const executeNode = async (job: Job) => {
     }
     
     expectedHandle = condition ? 'true' : 'false';
-    console.log(`[Queue] Conditional '${lhsRaw} ${op} ${rhsRaw}' evaluated to ${condition}, taking path: ${expectedHandle}`);
   }
 
   for (const edge of outgoingEdges) {
