@@ -636,9 +636,6 @@ export default function SidePanel({
 
                     {selectedNode.type === 'watchtower' && (
                       <div className="space-y-4">
-                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
-                          Watchtower uses the Tavily API to search the web and return context.
-                        </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Search Query</label>
                           <input
@@ -666,10 +663,6 @@ export default function SidePanel({
 
                     {selectedNode.type === 'jsonParser' && (
                       <div className="space-y-4">
-                        <div className="p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] rounded-md text-sm text-gray-300">
-                          <p className="mb-2">The Sorting Facility acts as a structural validation checkpoint.</p>
-                          <p>It automatically extracts the first valid JSON block from the incoming string, verifies it using standard JSON parsing, and outputs the clean object downstream. If the incoming text contains no valid JSON, the workflow halts with an error.</p>
-                        </div>
                       </div>
                     )}
 
@@ -699,9 +692,6 @@ export default function SidePanel({
 
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
-                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
-                          Write raw JavaScript. Use 'context' to read data. Must 'return' a value.
-                        </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">JavaScript Code</label>
                           <textarea
@@ -716,9 +706,6 @@ export default function SidePanel({
 
                     {selectedNode.type === 'webScraper' && (
                       <div className="space-y-4">
-                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
-                          The Print Shop scrapes raw text from a webpage URL.
-                        </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Target URL</label>
                           <input
@@ -734,10 +721,6 @@ export default function SidePanel({
 
                     {selectedNode.type === 'documentParser' && (
                       <div className="space-y-4">
-                        <div className="p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] rounded-md text-sm text-gray-300">
-                          <p className="mb-2">The Library accepts file uploads and extracts their raw text during execution.</p>
-                          <p>Currently supported: <strong>.pdf</strong>, <strong>.csv</strong>, <strong>.txt</strong></p>
-                        </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Document File</label>
                           <div className="relative">
@@ -850,9 +833,6 @@ export default function SidePanel({
                     
                     {selectedNode.type === 'limit' && (
                       <div className="space-y-4">
-                        <div className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono text-xs uppercase">
-                          Toll Booth controls how many times a loop can execute before stopping.
-                        </div>
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Max Items / Passes</label>
                           <input
@@ -879,8 +859,7 @@ export default function SidePanel({
                     
                     {selectedNode.type === 'webhook' && (
                       <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                        <div className="animate-pulse mb-2">● LISTENING FOR TRIGGER</div>
-                        The Webhook acts as the starting trigger. No configuration is required.
+                        <div className="animate-pulse">● LISTENING FOR TRIGGER</div>
                       </div>
                     )}
 
@@ -910,8 +889,7 @@ export default function SidePanel({
 
                     {selectedNode.type === 'output' && (
                       <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                        <div className="mb-2 text-orange-500 font-bold">» END OF LINE «</div>
-                        The Output node marks the final destination of the workflow. Check the LOGS to see the final output!
+                        <div className="text-orange-500 font-bold">» END OF LINE «</div>
                       </div>
                     )}
                   </div>
