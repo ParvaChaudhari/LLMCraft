@@ -11,7 +11,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'chatgptFactory') return 'openai';
   if (nodeType === 'claudeFactory') return 'anthropic';
   if (nodeType === 'watchtower') return 'tavily';
-  if (nodeType === 'dbSilo') return 'postgres';
+  if (nodeType === 'dbSilo' || nodeType === 'bankVault') return 'postgres';
   if (nodeType === 'apify') return 'apify';
   return null;
 };
@@ -81,6 +81,7 @@ const toolAssets: Record<string, string> = {
   dbSilo: 'db_silo.png',
   jsonParser: 'sorting_facility.png',
   apify: 'drone_hub.png',
+  bankVault: 'bank-vault.png',
 };
 
 export default function SidePanel({
@@ -102,6 +103,8 @@ export default function SidePanel({
   const [newCredKey, setNewCredKey] = useState('');
   const [isSavingCred, setIsSavingCred] = useState(false);
   const [activeTabs, setActiveTabs] = useState<string[]>(['input', 'tasks', 'logs']);
+  
+  const [embeddingCredentials, setEmbeddingCredentials] = useState<any[]>([]);
   
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
@@ -150,7 +153,21 @@ export default function SidePanel({
             setCredentials(data);
           }
         })
-        .catch(console.error);
+        .catch(err => console.error("Failed to fetch credentials:", err));
+    }
+  }, [selectedNode?.type]);
+
+  // Fetch embedding credentials specifically for Bank Vault
+  useEffect(() => {
+    if (selectedNode?.type === 'bankVault') {
+      Promise.all([
+        fetch('/api/credentials?type=openai').then(res => res.json()),
+        fetch('/api/credentials?type=gemini').then(res => res.json())
+      ]).then(([openaiCreds, geminiCreds]) => {
+        const o = Array.isArray(openaiCreds) ? openaiCreds : [];
+        const g = Array.isArray(geminiCreds) ? geminiCreds : [];
+        setEmbeddingCredentials([...o, ...g]);
+      }).catch(err => console.error("Failed to fetch embedding credentials:", err));
     }
   }, [selectedNode?.type]);
 
@@ -469,10 +486,12 @@ export default function SidePanel({
                     <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault'].includes(selectedNode.type) && (
                       <>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Authentication Credential</label>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">
+                            {selectedNode.type === 'bankVault' ? 'Database Credential (Postgres)' : 'Authentication Credential'}
+                          </label>
                           <div className="flex gap-2">
                             <select
                               value={data.credentialId || ''}
@@ -690,6 +709,67 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'bankVault' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Embedding Credential (AI Provider)</label>
+                          <select
+                            value={data.embeddingCredentialId || ''}
+                            onChange={(e) => handleChange('embeddingCredentialId', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                          >
+                            <option value="">-- Select Embedding Credential --</option>
+                            {embeddingCredentials.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Mode</label>
+                          <div className="flex border-[3px] border-[#2d2d2d] bg-[#1a1a1a]">
+                            <button
+                              onClick={() => handleChange('mode', 'save')}
+                              className={`flex-1 p-3 text-xs font-bold uppercase transition-colors ${(!data.mode || data.mode === 'save') ? 'bg-[#4af626] text-black' : 'text-gray-400 hover:text-[#4af626]'}`}
+                            >
+                              Save (Upsert)
+                            </button>
+                            <button
+                              onClick={() => handleChange('mode', 'search')}
+                              className={`flex-1 p-3 text-xs font-bold uppercase transition-colors ${(data.mode === 'search') ? 'bg-[#4af626] text-black' : 'text-gray-400 hover:text-[#4af626]'}`}
+                            >
+                              Search (RAG)
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Table Name</label>
+                          <input
+                            type="text"
+                            value={data.tableName || ''}
+                            onChange={(e) => handleChange('tableName', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            placeholder="documents"
+                          />
+                        </div>
+
+                        {data.mode === 'search' && (
+                          <div>
+                            <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Match Count Limit</label>
+                            <input
+                              type="number"
+                              value={data.matchCount || 3}
+                              onChange={(e) => handleChange('matchCount', parseInt(e.target.value))}
+                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                              placeholder="3"
+                              min="1"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div>
@@ -864,7 +944,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}

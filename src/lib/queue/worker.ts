@@ -578,6 +578,89 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'bankVault') {
+    const { mode, credentialId, embeddingCredentialId, tableName, matchCount } = currentNode.data;
+    const input = newContext.lastOutput;
+    
+    if (!credentialId || !embeddingCredentialId) {
+      newContext.lastOutput = 'Error: Bank Vault is missing required credentials.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else if (!input) {
+      newContext.lastOutput = 'Error: Bank Vault received empty input.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        console.log(`[Queue] Bank Vault (${mode || 'save'}) processing input...`);
+        const [dbConnectionString, embeddingKey] = await Promise.all([
+          fetchApiKey(credentialId),
+          fetchApiKey(embeddingCredentialId)
+        ]);
+        
+        if (!dbConnectionString) throw new Error('Database credential not found.');
+        if (!embeddingKey) throw new Error('Embedding credential not found.');
+        
+        let embeddingVector: number[] = [];
+        
+        // Auto-detect provider based on key format (Gemini vs OpenAI)
+        if (embeddingKey.startsWith('AIza')) {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${embeddingKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: "models/text-embedding-004",
+              content: { parts: [{ text: input }] }
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || 'Gemini Embedding Error');
+          embeddingVector = data.embedding.values;
+        } else {
+          const res = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${embeddingKey}`
+            },
+            body: JSON.stringify({
+              model: 'text-embedding-3-small',
+              input: input
+            })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error?.message || 'OpenAI Embedding Error');
+          embeddingVector = data.data[0].embedding;
+        }
+
+        // Connect to Postgres
+        const { Client } = require('pg');
+        const client = new Client({ connectionString: dbConnectionString });
+        await client.connect();
+        
+        const table = tableName || 'documents';
+        
+        if (mode === 'search') {
+          const limit = matchCount || 3;
+          // Using <-> (L2 distance / Euclidean) which is standard for pgvector
+          const query = `SELECT content FROM ${table} ORDER BY embedding <-> $1 LIMIT $2`;
+          const res = await client.query(query, [`[${embeddingVector.join(',')}]`, limit]);
+          const resultString = JSON.stringify(res.rows, null, 2);
+          newContext.lastOutput = resultString;
+          newContext[nodeId] = resultString;
+        } else {
+          const query = `INSERT INTO ${table} (content, embedding) VALUES ($1, $2)`;
+          await client.query(query, [input, `[${embeddingVector.join(',')}]`]);
+          newContext.lastOutput = `Successfully saved 1 document to ${table}.`;
+          newContext[nodeId] = newContext.lastOutput;
+        }
+        
+        await client.end();
+        console.log(`[Queue] Bank Vault operation complete.`);
+      } catch (err: any) {
+        console.error(`[Queue] Bank Vault Error:`, err.message);
+        newContext.lastOutput = `Error (Bank Vault): ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
