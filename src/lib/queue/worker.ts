@@ -73,6 +73,7 @@ const replaceVariables = (text: string, context: any) => {
 // Helper to fetch and decrypt API keys
 const fetchApiKey = async (credentialId: string): Promise<string | null> => {
   if (!credentialId) return null;
+  
   try {
     const supabase = createClient();
     const { data, error } = await supabase.from('credentials').select('encrypted_data').eq('id', credentialId).single();
@@ -603,11 +604,11 @@ const executeNode = async (job: Job) => {
         
         // Auto-detect provider based on key format (Gemini vs OpenAI)
         if (embeddingKey.startsWith('AIza')) {
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${embeddingKey}`, {
+          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=${embeddingKey}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              model: "models/text-embedding-004",
+              model: "models/gemini-embedding-2",
               content: { parts: [{ text: input }] }
             })
           });
@@ -658,6 +659,93 @@ const executeNode = async (job: Job) => {
       } catch (err: any) {
         console.error(`[Queue] Bank Vault Error:`, err.message);
         newContext.lastOutput = `Error (Bank Vault): ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
+  } else if (currentNode.type === 'artStudio') {
+    const rawPrompt = currentNode.data?.prompt || 'An isometric 3d render of an art studio.';
+    const model = currentNode.data?.model || 'dall-e-3';
+    const credentialId = currentNode.data?.credentialId;
+    
+    if (!credentialId) {
+      newContext.lastOutput = 'Error: Art Studio requires a credential.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const prompt = replaceVariables(rawPrompt, newContext);
+        console.log(`[Queue] Art Studio (${model}) generating image for prompt:`, prompt);
+        
+        const apiKey = await fetchApiKey(credentialId);
+        if (!apiKey) throw new Error('API key not found');
+        
+        let imageUrl = '';
+        
+        if (model.includes('dall-e') || model.includes('gpt-image') || model.includes('chatgpt-image')) {
+          const res = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify({
+              model: model,
+              prompt,
+              n: 1,
+              size: '1024x1024'
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          imageUrl = data.data[0].url;
+        } else if (model.includes('imagen')) {
+          // Google AI Studio Image Generation (Imagen)
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:predict?key=${apiKey}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              instances: [{ prompt }],
+              parameters: { sampleCount: 1 }
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          const base64 = data.predictions?.[0]?.bytesBase64Encoded || data.predictions?.[0]?.image?.bytesBase64Encoded;
+          
+          if (base64) {
+             imageUrl = base64.startsWith('http') ? base64 : `data:image/jpeg;base64,${base64}`;
+          } else {
+             imageUrl = "Generated image data not found in response payload.";
+          }
+        } else if (model.includes('gemini') || model.includes('nano')) {
+          // Gemini / Nano Banana Pro using generateContent
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }]
+            })
+          });
+          const data = await res.json();
+          if (data.error) throw new Error(data.error.message);
+          const firstPart = data.candidates?.[0]?.content?.parts?.[0];
+          const base64 = firstPart?.inlineData?.data || firstPart?.text || firstPart?.inline_data?.data;
+          
+          if (base64) {
+             imageUrl = base64.startsWith('http') ? base64 : `data:image/jpeg;base64,${base64}`;
+          } else {
+             imageUrl = "Generated image data not found in response payload.";
+          }
+        } else {
+           throw new Error('Unsupported model selected.');
+        }
+
+        newContext.lastOutput = `[IMAGE GENERATED]\nModel: ${model}\nURL/Data: ${imageUrl}`;
+        newContext[nodeId] = newContext.lastOutput;
+      } catch (err: any) {
+        console.error(`[Queue] Art Studio Error:`, err.message);
+        newContext.lastOutput = `Error (Art Studio): ${err.message}`;
         newContext[nodeId] = newContext.lastOutput;
       }
     }

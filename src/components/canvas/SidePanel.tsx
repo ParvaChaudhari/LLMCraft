@@ -79,9 +79,9 @@ const toolAssets: Record<string, string> = {
   webScraper: 'print_shop.png',
   documentParser: 'library.png',
   dbSilo: 'db_silo.png',
-  jsonParser: 'sorting_facility.png',
   apify: 'drone_hub.png',
   bankVault: 'bank-vault.png',
+  artStudio: 'art_studio.png',
 };
 
 export default function SidePanel({
@@ -159,7 +159,7 @@ export default function SidePanel({
 
   // Fetch embedding credentials specifically for Bank Vault
   useEffect(() => {
-    if (selectedNode?.type === 'bankVault') {
+    if (selectedNode?.type === 'bankVault' || selectedNode?.type === 'artStudio') {
       Promise.all([
         fetch('/api/credentials?type=openai').then(res => res.json()),
         fetch('/api/credentials?type=gemini').then(res => res.json())
@@ -285,7 +285,7 @@ export default function SidePanel({
 
   const handleInsertVariable = (path: string) => {
     const templateTag = `{{${path}}}`;
-    if (LLM_NODE_TYPES.includes(selectedNode.type)) {
+    if (LLM_NODE_TYPES.includes(selectedNode.type) || selectedNode.type === 'artStudio') {
       const currentPrompt = selectedNode.data?.prompt || '';
       handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'httpRequest') {
@@ -770,6 +770,49 @@ export default function SidePanel({
                       </div>
                     )}
 
+                    {selectedNode.type === 'artStudio' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">API Credential</label>
+                          <select
+                            value={data.credentialId || ''}
+                            onChange={(e) => handleChange('credentialId', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                          >
+                            <option value="">-- Select Credential --</option>
+                            {embeddingCredentials.map(c => (
+                              <option key={c.id} value={c.id}>{c.name} ({c.type})</option>
+                            ))}
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Model Version</label>
+                          <select
+                            value={data.model || ''}
+                            onChange={(e) => handleChange('model', e.target.value)}
+                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                          >
+                            <option value="">-- Select Model --</option>
+                            <option value="dall-e-3">DALL-E 3 (Requires OpenAI Key)</option>
+                            <option value="gpt-image-2">GPT Image 2 (Requires OpenAI Key)</option>
+                            <option value="chatgpt-image-latest">ChatGPT Image Latest (Requires OpenAI Key)</option>
+                            <option value="gemini-3-pro-image">Nano Banana Pro (Requires Gemini Key)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Image Prompt</label>
+                          <textarea
+                            value={data.prompt || ''}
+                            onChange={(e) => handleChange('prompt', e.target.value)}
+                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            placeholder="An isometric building based on: {{lastOutput}}"
+                          />
+                        </div>
+                      </div>
+                    )}
+
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div>
@@ -944,7 +987,7 @@ export default function SidePanel({
                     )}
 
                     {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault'].includes(selectedNode.type) && (
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio'].includes(selectedNode.type) && (
                       <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
                         <button
                           onClick={executeNodeStandalone}
@@ -1036,11 +1079,21 @@ export default function SidePanel({
                             );
                           }
                         })() : (
-                          <textarea 
-                            readOnly 
-                            className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
-                            value={data.output}
-                          />
+                          data.output.includes('[IMAGE GENERATED]') ? (() => {
+                            const match = data.output.match(/URL\/Data:\s*(.*)/);
+                            const imgUrl = match ? match[1].trim() : '';
+                            return (
+                              <div className="flex-1 w-full overflow-y-auto flex flex-col items-center custom-scrollbar">
+                                <img src={imgUrl} alt="Generated" className="max-w-full rounded-md border-[4px] border-[#2d2d2d]" />
+                              </div>
+                            );
+                          })() : (
+                            <textarea 
+                              readOnly 
+                              className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4 custom-scrollbar"
+                              value={data.output}
+                            />
+                          )
                         )
                       ) : (
                         <div className="flex-1 flex items-center justify-center flex-col text-gray-600 font-mono text-sm">

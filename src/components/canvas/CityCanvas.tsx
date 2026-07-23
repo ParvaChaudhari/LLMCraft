@@ -39,6 +39,7 @@ import DBSiloNode from './nodes/DBSiloNode';
 import SortingFacilityNode from './nodes/SortingFacilityNode';
 import ApifyNode from './nodes/ApifyNode';
 import BankVaultNode from './nodes/BankVaultNode';
+import ArtStudioNode from './nodes/ArtStudioNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -63,6 +64,7 @@ const nodeTypes = {
   jsonParser: SortingFacilityNode,
   apify: ApifyNode,
   bankVault: BankVaultNode,
+  artStudio: ArtStudioNode,
 };
 
 const edgeTypes = {

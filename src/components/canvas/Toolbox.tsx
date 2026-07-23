@@ -28,6 +28,7 @@ const toolItems: ToolItem[] = [
   { type: 'jsonParser',     name: 'Sorting Facility', icon: '[S]', description: 'JSON Validator',             longDescription: 'Extract and validate structured JSON from raw LLM text outputs. Blocks invalid formatting.', color: '#22c55e', asset: 'sorting_facility.png' },
   { type: 'apify',          name: 'Apify Hub',        icon: '[A]', description: 'Apify Automation',           longDescription: 'Trigger third-party Apify web scrapers and automation bots in the cloud.', color: '#3b82f6', asset: 'drone_hub.png' },
   { type: 'bankVault',      name: 'Supabase Center',  icon: '[V]', description: 'Supabase Vector DB',         longDescription: 'Connect to Supabase to store and retrieve semantic embeddings for RAG workflows.', color: '#4af626', asset: 'bank-vault.png' },
+  { type: 'artStudio',      name: 'Art Studio',       icon: '[🎨]', description: 'Image Generation',         longDescription: 'Generate images using DALL-E, Imagen 4, or Nano Banana Pro based on dynamic prompts.', color: '#facc15', asset: 'art_studio.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {
