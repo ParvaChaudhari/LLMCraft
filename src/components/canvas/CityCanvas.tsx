@@ -392,6 +392,12 @@ export default function CityCanvas() {
     }
   };
 
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
+
   return (
     <div className="w-full h-full relative bg-[#4CAF50] flex">
       {/* Toolbox on the left */}
@@ -455,6 +461,12 @@ export default function CityCanvas() {
           }`}
         >
           {isRunning ? 'Running...' : 'Run'}
+        </button>
+        <button
+          onClick={handleLogout}
+          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg transition-colors"
+        >
+          Logout
         </button>
       </div>
 

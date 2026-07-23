@@ -19,11 +19,11 @@ const getCredentialProvider = (nodeType: string): string | null => {
 const JsonNode = ({ keyName, value, path, onInsert }: any) => {
   const [expanded, setExpanded] = useState(true);
   const isObject = value !== null && typeof value === 'object';
-  
+
   if (isObject) {
     return (
       <div className="ml-2 border-l-2 border-[#333] pl-2 my-1 font-mono text-sm">
-        <div 
+        <div
           className="cursor-pointer hover:bg-[#333] inline-block px-1 text-blue-400 font-bold"
           onClick={() => setExpanded(!expanded)}
         >
@@ -32,12 +32,12 @@ const JsonNode = ({ keyName, value, path, onInsert }: any) => {
         {expanded && (
           <div>
             {Object.entries(value).map(([k, v]) => (
-              <JsonNode 
-                key={k} 
-                keyName={k} 
-                value={v} 
-                path={path ? `${path}.${k}` : k} 
-                onInsert={onInsert} 
+              <JsonNode
+                key={k}
+                keyName={k}
+                value={v}
+                path={path ? `${path}.${k}` : k}
+                onInsert={onInsert}
               />
             ))}
           </div>
@@ -52,7 +52,7 @@ const JsonNode = ({ keyName, value, path, onInsert }: any) => {
       <span className="text-orange-400 font-bold mr-2 whitespace-nowrap">{keyName}:</span>
       <span className="text-green-300 break-words">{String(value)}</span>
       {onInsert && (
-        <button 
+        <button
           onClick={() => onInsert(path)}
           className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 rounded-sm hover:bg-[#3ade1d] transition-opacity"
           title="Insert Variable"
@@ -103,9 +103,9 @@ export default function SidePanel({
   const [newCredKey, setNewCredKey] = useState('');
   const [isSavingCred, setIsSavingCred] = useState(false);
   const [activeTabs, setActiveTabs] = useState<string[]>(['input', 'tasks', 'logs']);
-  
+
   const [embeddingCredentials, setEmbeddingCredentials] = useState<any[]>([]);
-  
+
   const [dynamicModels, setDynamicModels] = useState<string[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
   const [modelsError, setModelsError] = useState<string | null>(null);
@@ -126,11 +126,10 @@ export default function SidePanel({
   const TabButton = ({ id, label }: { id: string, label: string }) => {
     const isActive = activeTabs.includes(id);
     return (
-      <button 
+      <button
         onClick={() => toggleTab(id)}
-        className={`px-6 py-2 font-bold uppercase tracking-widest text-sm border-[4px] border-[#1a1a1a] border-b-0 transition-colors ${
-          isActive ? 'bg-[#d8c8b8] text-[#1a1a1a]' : 'bg-[#1a1a1a] text-gray-500 hover:text-gray-300'
-        }`}
+        className={`px-6 py-2 font-bold uppercase tracking-widest text-sm border-[4px] border-[#1a1a1a] border-b-0 transition-colors ${isActive ? 'bg-[#d8c8b8] text-[#1a1a1a]' : 'bg-[#1a1a1a] text-gray-500 hover:text-gray-300'
+          }`}
       >
         {label}
       </button>
@@ -140,7 +139,7 @@ export default function SidePanel({
   // Fetch credentials when a node that needs them is selected
   useEffect(() => {
     const credType = getCredentialProvider(selectedNode?.type);
-    
+
     if (credType) {
       if (globalCredCache[credType]) {
         setCredentials(globalCredCache[credType]);
@@ -306,14 +305,14 @@ export default function SidePanel({
     try {
       const credType = getCredentialProvider(selectedNode.type);
       if (!credType) return;
-      
+
       const res = await fetch('/api/credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newCredName, type: credType, apiKey: newCredKey })
       });
       const newCred = await res.json();
-      
+
       if (newCred.id) {
         setCredentials(prev => [newCred, ...prev]);
         handleChange('credentialId', newCred.id); // Auto select it
@@ -354,12 +353,12 @@ export default function SidePanel({
       return (
         <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
           {Object.entries(parsedJson).map(([k, v]) => (
-            <JsonNode 
-              key={k} 
-              keyName={k} 
-              value={v} 
-              path={`${node.id}.${k}`} 
-              onInsert={handleInsertVariable} 
+            <JsonNode
+              key={k}
+              keyName={k}
+              value={v}
+              path={`${node.id}.${k}`}
+              onInsert={handleInsertVariable}
             />
           ))}
         </div>
@@ -368,19 +367,19 @@ export default function SidePanel({
 
     return (
       <div className="flex-1 flex flex-col relative group">
-        <textarea 
-          readOnly 
+        <textarea
+          readOnly
           className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
           value={outputData || 'No output generated yet.'}
         />
         {outputData && (
-           <button 
-             onClick={() => handleInsertVariable(node.id)}
-             className="absolute top-0 right-4 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 py-1 rounded-sm hover:bg-[#3ade1d] transition-opacity"
-             title="Insert Variable"
-           >
-             + Insert String
-           </button>
+          <button
+            onClick={() => handleInsertVariable(node.id)}
+            className="absolute top-0 right-4 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 py-1 rounded-sm hover:bg-[#3ade1d] transition-opacity"
+            title="Insert Variable"
+          >
+            + Insert String
+          </button>
         )}
       </div>
     );
@@ -388,13 +387,13 @@ export default function SidePanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-8 pointer-events-auto">
-      
+
       {/* Main Modal Container */}
-      <div 
+      <div
         className="w-[95%] max-w-[1600px] h-[85vh] bg-[#2d2d2d] border-[4px] border-[#1a1a1a] flex flex-col shadow-2xl relative"
         style={{ boxShadow: '8px 8px 0px rgba(0,0,0,0.5)' }}
       >
-        
+
         {/* Header Bar */}
         <div className="h-12 bg-[#1a1a1a] flex justify-between items-center px-4 border-b-[4px] border-[#1a1a1a]">
           <div className="flex items-center space-x-4">
@@ -414,7 +413,7 @@ export default function SidePanel({
 
         {/* Content Area */}
         <div className="flex-1 flex flex-row overflow-hidden p-4 gap-4 bg-[#3d3d3d]">
-          
+
           {/* LEFT COLUMN (1/4 Width) - Asset Preview */}
           <div className="w-1/4 flex flex-col gap-2">
             <div className="flex-1 bg-[#1a1a1a] border-[4px] border-[#2d2d2d] flex items-center justify-center relative overflow-hidden p-8" style={{
@@ -423,14 +422,14 @@ export default function SidePanel({
               backgroundPosition: 'center center'
             }}>
               {assetName && (
-                <img 
-                  src={`/assets/${assetName}`} 
-                  alt={selectedNode.type} 
+                <img
+                  src={`/assets/${assetName}`}
+                  alt={selectedNode.type}
                   className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(74,246,38,0.3)] hover:scale-105 transition-transform"
                 />
               )}
             </div>
-            
+
             {/* Building Stats Panel */}
             <div className="h-24 bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-3 text-[#4af626] font-mono text-sm leading-tight uppercase flex flex-col justify-center">
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
@@ -441,7 +440,7 @@ export default function SidePanel({
 
           {/* RIGHT COLUMN (3/4 Width) - Toggleable Tabs */}
           <div className="w-3/4 flex flex-col">
-            
+
             {/* TAB BAR */}
             <div className="flex gap-2 px-4">
               <TabButton id="input" label="Input" />
@@ -451,7 +450,7 @@ export default function SidePanel({
 
             {/* UNIFIED CONTAINER */}
             <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-row overflow-hidden relative">
-              
+
               {/* COLUMN 1: INPUT */}
               {activeTabs.includes('input') && (
                 <div className="flex-1 flex flex-col overflow-hidden">
@@ -504,14 +503,14 @@ export default function SidePanel({
                               ))}
                             </select>
 
-                            <button 
+                            <button
                               onClick={() => setShowNewCredForm(!showNewCredForm)}
                               className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-[#4af626] border-[3px] border-[#2d2d2d] px-4 font-bold text-xl transition-colors"
                             >
                               {showNewCredForm ? '-' : '+'}
                             </button>
                           </div>
-                          
+
                           {showNewCredForm && (
                             <div className="mt-2 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] space-y-4">
                               <h4 className="text-[#c4b4a4] font-bold text-xs uppercase tracking-widest border-b border-[#333] pb-2">Create New Credential</h4>
@@ -552,54 +551,54 @@ export default function SidePanel({
                         {LLM_NODE_TYPES.includes(selectedNode.type) && (
                           <>
                             <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
-                            <span>AI Model Version</span>
-                            {LLM_NODE_TYPES.includes(selectedNode.type) && data.credentialId && (
-                               <button 
-                                 onClick={() => fetchModels(data.credentialId, true)}
-                                 className="text-black hover:text-gray-700 transition-colors"
-                                 title="Reload Models"
-                               >
-                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3"/></svg>
-                               </button>
-                            )}
-                          </label>
-                          {isLoadingModels ? (
-                             <div className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] font-bold animate-pulse text-sm">Fetching live models...</div>
-                          ) : modelsError === 'Credential not found' || !data.credentialId ? (
-                             <div className="w-full bg-[#1a1a1a] text-gray-500 p-3 border-[3px] border-[#2d2d2d] font-mono text-sm">
-                               Select a valid credential to load models.
-                             </div>
-                          ) : modelsError ? (
-                             <div className="w-full bg-[#1a1a1a] text-red-500 p-3 border-[3px] border-red-900 font-bold text-sm">
-                               Error: {modelsError}
-                             </div>
-                          ) : (
-                            <select
-                              value={data.model || ''}
-                              onChange={(e) => handleChange('model', e.target.value)}
-                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
-                            >
-                              <option value="">-- Select Model --</option>
-                              {LLM_NODE_TYPES.includes(selectedNode.type) && (
-                                dynamicModels.map(m => (
-                                  <option key={m} value={m}>{m}</option>
-                                ))
+                              <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
+                                <span>AI Model Version</span>
+                                {LLM_NODE_TYPES.includes(selectedNode.type) && data.credentialId && (
+                                  <button
+                                    onClick={() => fetchModels(data.credentialId, true)}
+                                    className="text-black hover:text-gray-700 transition-colors"
+                                    title="Reload Models"
+                                  >
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.3" /></svg>
+                                  </button>
+                                )}
+                              </label>
+                              {isLoadingModels ? (
+                                <div className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] font-bold animate-pulse text-sm">Fetching live models...</div>
+                              ) : modelsError === 'Credential not found' || !data.credentialId ? (
+                                <div className="w-full bg-[#1a1a1a] text-gray-500 p-3 border-[3px] border-[#2d2d2d] font-mono text-sm">
+                                  Select a valid credential to load models.
+                                </div>
+                              ) : modelsError ? (
+                                <div className="w-full bg-[#1a1a1a] text-red-500 p-3 border-[3px] border-red-900 font-bold text-sm">
+                                  Error: {modelsError}
+                                </div>
+                              ) : (
+                                <select
+                                  value={data.model || ''}
+                                  onChange={(e) => handleChange('model', e.target.value)}
+                                  className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                                >
+                                  <option value="">-- Select Model --</option>
+                                  {LLM_NODE_TYPES.includes(selectedNode.type) && (
+                                    dynamicModels.map(m => (
+                                      <option key={m} value={m}>{m}</option>
+                                    ))
+                                  )}
+                                </select>
                               )}
-                            </select>
-                          )}
-                        </div>
-                        <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Instruction Prompt</label>
-                          <textarea
-                            value={data.prompt || ''}
-                            onChange={(e) => handleChange('prompt', e.target.value)}
-                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
-                            placeholder="Summarize this: {{lastOutput}}"
-                          />
-                        </div>
-                      </>
-                    )}
+                            </div>
+                            <div>
+                              <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Instruction Prompt</label>
+                              <textarea
+                                value={data.prompt || ''}
+                                onChange={(e) => handleChange('prompt', e.target.value)}
+                                className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                                placeholder="Summarize this: {{lastOutput}}"
+                              />
+                            </div>
+                          </>
+                        )}
                       </>
                     )}
 
@@ -630,7 +629,7 @@ export default function SidePanel({
                             />
                           </div>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Headers (JSON)</label>
                           <textarea
@@ -640,7 +639,7 @@ export default function SidePanel({
                             placeholder='{"Content-Type": "application/json"}'
                           />
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Body (JSON)</label>
                           <textarea
@@ -724,7 +723,7 @@ export default function SidePanel({
                             ))}
                           </select>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Mode</label>
                           <div className="flex border-[3px] border-[#2d2d2d] bg-[#1a1a1a]">
@@ -785,7 +784,7 @@ export default function SidePanel({
                             ))}
                           </select>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Model Version</label>
                           <select
@@ -855,7 +854,7 @@ export default function SidePanel({
                                 if (!file) return;
                                 try {
                                   updateNodeData(selectedNode.id, { isUploading: true, uploadError: null });
-                                  
+
                                   // Clean up old file if it exists
                                   if (data.filePath) {
                                     await fetch('/api/upload', {
@@ -953,7 +952,7 @@ export default function SidePanel({
                         </div>
                       </div>
                     )}
-                    
+
                     {selectedNode.type === 'limit' && (
                       <div className="space-y-4">
                         <div>
@@ -979,7 +978,7 @@ export default function SidePanel({
                         </div>
                       </div>
                     )}
-                    
+
                     {selectedNode.type === 'webhook' && (
                       <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
                         <div className="animate-pulse">● LISTENING FOR TRIGGER</div>
@@ -992,11 +991,10 @@ export default function SidePanel({
                         <button
                           onClick={executeNodeStandalone}
                           disabled={isNodeRunning}
-                          className={`w-full py-3 font-bold text-sm uppercase tracking-widest border-[3px] transition-colors flex items-center justify-center gap-2 ${
-                            isNodeRunning
+                          className={`w-full py-3 font-bold text-sm uppercase tracking-widest border-[3px] transition-colors flex items-center justify-center gap-2 ${isNodeRunning
                               ? 'bg-[#1a1a1a] text-gray-500 border-[#2d2d2d] cursor-not-allowed'
                               : 'bg-[#4af626] hover:bg-[#3ade1d] text-black border-[#3ade1d] hover:border-[#2ac514]'
-                          }`}
+                            }`}
                         >
                           {isNodeRunning ? (
                             <>
@@ -1033,11 +1031,10 @@ export default function SidePanel({
                           {data.output && (
                             <button
                               onClick={() => setViewAsJson(!viewAsJson)}
-                              className={`px-3 py-1 text-[10px] font-bold border-2 transition-colors ${
-                                viewAsJson 
-                                  ? 'bg-[#4af626] text-black border-[#4af626]' 
+                              className={`px-3 py-1 text-[10px] font-bold border-2 transition-colors ${viewAsJson
+                                  ? 'bg-[#4af626] text-black border-[#4af626]'
                                   : 'bg-transparent text-gray-400 border-gray-600 hover:text-white hover:border-gray-400'
-                              }`}
+                                }`}
                             >
                               JSON
                             </button>
@@ -1056,16 +1053,16 @@ export default function SidePanel({
                           } catch (e) {
                             // Invalid JSON
                           }
-                          
+
                           if (parsedJson && typeof parsedJson === 'object') {
                             return (
                               <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
                                 {Object.entries(parsedJson).map(([k, v]) => (
-                                  <JsonNode 
-                                    key={k} 
-                                    keyName={k} 
-                                    value={v} 
-                                    path={k} 
+                                  <JsonNode
+                                    key={k}
+                                    keyName={k}
+                                    value={v}
+                                    path={k}
                                   />
                                 ))}
                               </div>
@@ -1088,8 +1085,8 @@ export default function SidePanel({
                               </div>
                             );
                           })() : (
-                            <textarea 
-                              readOnly 
+                            <textarea
+                              readOnly
                               className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4 custom-scrollbar"
                               value={data.output}
                             />

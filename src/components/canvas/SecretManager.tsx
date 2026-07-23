@@ -3,8 +3,15 @@ import { useState, useEffect } from 'react';
 export default function SecretManager({ onClose }: { onClose: () => void }) {
   const [credentials, setCredentials] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+
+  const [isCreating, setIsCreating] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newKey, setNewKey] = useState('');
+  const [newType, setNewType] = useState('openai');
 
   const fetchCredentials = async () => {
     setIsLoading(true);
@@ -58,122 +65,225 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
     }
   };
 
+  const handleCreateNew = async () => {
+    if (!newName || !newKey) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/credentials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName, type: newType, data: newKey })
+      });
+      const added = await res.json();
+      if (added.id) {
+        setCredentials(prev => [added, ...prev]);
+        setIsCreating(false);
+        setNewName('');
+        setNewKey('');
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleCancelEdit = () => {
     setEditingId(null);
   };
 
+  const filteredCredentials = credentials.filter(c => 
+    c.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    c.type.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const getTypeIcon = (type: string) => {
+    if (type.includes('openai')) return 'memory';
+    if (type.includes('anthropic') || type.includes('claude')) return 'smart_toy';
+    if (type.includes('aws') || type.includes('gcp') || type.includes('azure')) return 'cloud';
+    if (type.includes('gemini') || type.includes('google')) return 'language';
+    if (type.includes('groq')) return 'bolt';
+    if (type.includes('togetherai')) return 'hub';
+    if (type.includes('supabase')) return 'database';
+    return 'key';
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-8 pointer-events-auto">
-      
-      {/* Modal Container */}
-      <div 
-        className="w-[90%] max-w-[1000px] bg-[#2d2d2d] border-[4px] border-[#1a1a1a] flex flex-col shadow-2xl relative"
-        style={{ boxShadow: '8px 8px 0px rgba(0,0,0,0.5)' }}
-      >
-        
-        {/* Header Bar */}
-        <div className="h-12 bg-[#1a1a1a] flex justify-between items-center px-4 border-b-[4px] border-[#1a1a1a]">
-          <div className="flex items-center space-x-4">
-            <span className="text-[#c4b4a4] font-bold tracking-widest uppercase flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-              </svg>
-              SECRET MANAGER
-            </span>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-[var(--spacing-gutter-md)] pointer-events-auto bg-[var(--color-on-surface)]/80 backdrop-blur-sm">
+      <div className="absolute inset-0 scanline z-0 pointer-events-none opacity-20"></div>
+
+      <div className="relative z-10 w-full max-w-2xl bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex justify-between items-center relative overflow-hidden">
+          <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
+          <div className="flex items-center gap-[var(--spacing-gutter-sm)] relative z-10">
+            <span className="material-symbols-outlined text-[var(--color-inverse-primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
+            <h2 className="font-[family-name:var(--font-headline-md)] text-[length:var(--text-headline-md)] text-[var(--color-inverse-primary)] tracking-tight">SECRET_MANAGER</h2>
           </div>
-          <button onClick={onClose} className="text-red-500 hover:text-red-400 font-bold text-xl px-2 bg-[#2d2d2d] border-2 border-[#1a1a1a] transition-colors">
-            X
+          <button onClick={onClose} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10">
+            <span className="material-symbols-outlined">close</span>
           </button>
         </div>
 
-        {/* Content Area */}
-        <div className="p-8 bg-[#3d3d3d] max-h-[70vh] overflow-y-auto">
-          
-          <div className="mb-6 bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d]">
-            <p className="text-[#4af626] font-mono text-sm">
-              &gt; Secure Vault System Online.<br/>
-              &gt; All API keys are encrypted at rest. For security reasons, raw keys cannot be viewed or copied after creation.<br/>
-              &gt; You may safely delete or rename your keys here.
-            </p>
+        {/* Body */}
+        <div className="p-[var(--spacing-gutter-md)] flex flex-col gap-[var(--spacing-gutter-md)] overflow-y-auto bg-[var(--color-primary-container)]">
+          {/* Tools/Filters Row */}
+          <div className="flex justify-between items-end gap-4">
+            <div className="flex-grow relative">
+              <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)] z-10">search</span>
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] pl-8 pr-2 py-1 bevel-inset focus:outline-none focus:ring-0 placeholder:text-[var(--color-on-surface-variant)]" 
+                placeholder="Search secrets..." 
+              />
+            </div>
+            {/* 
+            <button 
+              onClick={() => setIsCreating(!isCreating)}
+              className="bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] px-4 py-2 border-2 border-[var(--color-on-surface)] retro-btn flex items-center gap-1 shrink-0"
+            >
+              <span className="material-symbols-outlined text-[16px]">{isCreating ? 'close' : 'add'}</span>
+              {isCreating ? 'CANCEL' : 'NEW SECRET'}
+            </button>
+            */}
           </div>
 
-          {isLoading ? (
-            <div className="flex justify-center items-center h-32">
-              <div className="text-[#4af626] font-mono text-xl animate-pulse">Decrypting vault metadata...</div>
+          {/* Inline Create Form (Commented out for now) */}
+          {/*
+          {isCreating && (
+            <div className="bg-[var(--color-surface)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex flex-col gap-2 shadow-[2px_2px_0_0_rgba(0,0,0,0.5)]">
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  autoComplete="off"
+                  data-lpignore="true"
+                  placeholder="Key Name (e.g. prod_api_key)" 
+                  className="flex-1 bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-2 py-1 bevel-inset focus:outline-none placeholder:text-[var(--color-on-surface-variant)]" 
+                />
+                <select 
+                  value={newType}
+                  onChange={e => setNewType(e.target.value)}
+                  className="bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-2 py-1 bevel-inset focus:outline-none cursor-pointer"
+                >
+                  <option value="openai">OPENAI</option>
+                  <option value="anthropic">ANTHROPIC</option>
+                  <option value="gemini">GEMINI</option>
+                  <option value="tavily">TAVILY</option>
+                  <option value="apify">APIFY</option>
+                  <option value="postgres">POSTGRES (SUPABASE)</option>
+                  <option value="string">STRING (CUSTOM)</option>
+                </select>
+              </div>
+              <div className="flex gap-2">
+                <input 
+                  type="password" 
+                  value={newKey}
+                  onChange={e => setNewKey(e.target.value)}
+                  autoComplete="new-password"
+                  data-lpignore="true"
+                  placeholder="Paste Secret Value..." 
+                  className="flex-1 bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-2 py-1 bevel-inset focus:outline-none placeholder:text-[var(--color-on-surface-variant)]" 
+                />
+                <button 
+                  onClick={handleCreateNew}
+                  disabled={!newName || !newKey || isLoading}
+                  className="bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] px-4 py-1 border-2 border-[var(--color-on-surface)] retro-btn disabled:opacity-50 hover:bg-[#5ae658]"
+                >
+                  SAVE KEY
+                </button>
+              </div>
             </div>
-          ) : credentials.length === 0 ? (
-            <div className="flex justify-center items-center h-32 bg-[#1a1a1a] border-[3px] border-[#2d2d2d]">
-              <div className="text-gray-500 font-mono text-lg uppercase tracking-widest">Vault is empty</div>
+          )}
+          */}
+
+          {/* Secrets List */}
+          <div className="flex flex-col gap-[var(--spacing-gutter-sm)]">
+            {/* Column Headers */}
+            <div className="flex px-[var(--spacing-gutter-sm)] py-1 font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] text-[var(--color-on-primary-container)] border-b-2 border-[var(--color-on-primary-fixed-variant)]">
+              <div className="w-1/3">PROVIDER</div>
+              <div className="w-1/3">KEY_NAME</div>
+              <div className="w-1/6 text-center">STATUS</div>
+              <div className="w-1/6 text-right">ACTIONS</div>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {credentials.map(cred => (
-                <div key={cred.id} className="bg-[#1a1a1a] p-4 border-[3px] border-[#2d2d2d] flex items-center justify-between hover:bg-[#222] transition-colors group">
-                  <div className="flex-1 flex flex-col">
-                    <div className="flex items-center gap-3 mb-1">
-                      {editingId === cred.id ? (
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={e => setEditName(e.target.value)}
-                          className="bg-[#2d2d2d] text-[#4af626] font-bold text-lg p-1 px-2 outline-none border-b-2 border-[#4af626]"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveEdit(cred.id);
-                            if (e.key === 'Escape') handleCancelEdit();
-                          }}
-                        />
-                      ) : (
-                        <h4 className="text-[#e0e0e0] font-bold text-lg tracking-wide">{cred.name}</h4>
-                      )}
-                      <span className="bg-[#3d3d3d] text-gray-300 text-xs px-2 py-1 font-bold uppercase tracking-wider rounded-sm border border-[#555]">
-                        {cred.type}
-                      </span>
-                    </div>
-                    <span className="text-gray-500 font-mono text-xs">
-                      Stored on: {new Date(cred.created_at).toLocaleString()}
-                    </span>
+
+            {isLoading && !isCreating ? (
+              <div className="text-center py-8 text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                Decrypting payload...
+              </div>
+            ) : filteredCredentials.length === 0 ? (
+              <div className="text-center py-8 text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] opacity-70">
+                {searchQuery ? "No matching secrets found." : "Vault is empty."}
+              </div>
+            ) : (
+              filteredCredentials.map(cred => (
+                <div key={cred.id} className="bg-[var(--color-surface)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex items-center shadow-[2px_2px_0_0_rgba(0,0,0,0.5)]">
+                  <div className="w-1/3 flex items-center gap-2 font-[family-name:var(--font-headline-md)] text-[length:var(--text-headline-md)] uppercase">
+                    <span className="material-symbols-outlined text-[var(--color-primary)]">{getTypeIcon(cred.type)}</span>
+                    {cred.type.replace('_', ' ')}
                   </div>
                   
-                  <div className="flex gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                  <div className="w-1/3 font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface-variant)] pr-2">
+                    {editingId === cred.id ? (
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={e => setEditName(e.target.value)}
+                        className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] px-1 bevel-inset outline-none"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveEdit(cred.id);
+                          if (e.key === 'Escape') handleCancelEdit();
+                        }}
+                      />
+                    ) : (
+                      cred.name
+                    )}
+                  </div>
+
+                  <div className="w-1/6 flex justify-center">
+                    <div className="bg-[#1A1A1A] border-2 border-[var(--color-on-surface)] px-2 py-1 flex items-center gap-1 rounded-sm">
+                      <div className="w-2 h-2 rounded-full bg-[var(--color-tertiary-fixed-dim)]" style={{ boxShadow: '0 0 4px var(--color-tertiary-fixed)' }}></div>
+                      <span className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] text-[var(--color-tertiary-fixed)]">ACTIVE</span>
+                    </div>
+                  </div>
+
+                  <div className="w-1/6 flex justify-end gap-1">
                     {editingId === cred.id ? (
                       <>
-                        <button 
-                          onClick={() => handleSaveEdit(cred.id)}
-                          className="bg-[#4af626] hover:bg-[#3ade1d] text-black font-bold px-4 py-2 text-sm uppercase tracking-wider"
-                        >
-                          Save
+                        <button onClick={() => handleSaveEdit(cred.id)} className="p-1 bg-[var(--color-surface-variant)] border-2 border-[var(--color-on-surface)] retro-btn hover:bg-[var(--color-tertiary-fixed)] text-[var(--color-on-surface)]" title="Save">
+                          <span className="material-symbols-outlined text-[16px]">check</span>
                         </button>
-                        <button 
-                          onClick={handleCancelEdit}
-                          className="bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white border-2 border-[#555] font-bold px-4 py-2 text-sm uppercase tracking-wider"
-                        >
-                          Cancel
+                        <button onClick={handleCancelEdit} className="p-1 bg-[var(--color-surface-variant)] border-2 border-[var(--color-on-surface)] retro-btn hover:bg-[var(--color-error-container)] text-[var(--color-error)]" title="Cancel">
+                          <span className="material-symbols-outlined text-[16px]">close</span>
                         </button>
                       </>
                     ) : (
                       <>
-                        <button 
-                          onClick={() => handleStartEdit(cred)}
-                          className="bg-[#2d2d2d] hover:bg-[#3d3d3d] text-[#4af626] border-[3px] border-[#2d2d2d] font-bold px-4 py-2 text-sm uppercase tracking-wider transition-colors"
-                        >
-                          Edit
+                        <button onClick={() => handleStartEdit(cred)} className="p-1 bg-[var(--color-surface-variant)] border-2 border-[var(--color-on-surface)] retro-btn hover:bg-[var(--color-primary-fixed)] text-[var(--color-on-surface)]" title="Edit">
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
                         </button>
-                        <button 
-                          onClick={() => handleDelete(cred.id)}
-                          className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-red-500 border-[3px] border-[#2d2d2d] font-bold px-4 py-2 text-sm uppercase tracking-wider transition-colors"
-                          title="Delete Secret"
-                        >
-                          Delete
+                        <button onClick={() => handleDelete(cred.id)} className="p-1 bg-[var(--color-surface-variant)] border-2 border-[var(--color-on-surface)] retro-btn hover:bg-[var(--color-error-container)] text-[var(--color-error)]" title="Revoke">
+                          <span className="material-symbols-outlined text-[16px]">delete</span>
                         </button>
                       </>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
+        </div>
 
+        {/* Footer */}
+        <div className="bg-[var(--color-surface)] border-t-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex justify-between items-center bg-[var(--color-secondary-container)]">
+          <span className="font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-secondary-container)]">TOTAL SECRETS: {credentials.length}</span>
+          <button onClick={onClose} className="bg-[var(--color-surface)] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] px-4 py-2 border-2 border-[var(--color-on-surface)] retro-btn hover:bg-[var(--color-surface-variant)] uppercase">
+            CLOSE VAULT
+          </button>
         </div>
       </div>
     </div>
