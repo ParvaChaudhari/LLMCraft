@@ -52,19 +52,17 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <button 
           onClick={() => setIsExpanded(true)}
-          className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-bold font-[family-name:var(--font-code-sm)] text-2xl w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-surface)] transition-colors"
+          className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#facc15] hover:text-black tactile-button transition-colors font-bold text-2xl"
           title="Open Toolbox"
         >
           +
         </button>
         <button 
           onClick={() => onOpenSecretManager?.()}
-          className="bg-[var(--color-inverse-surface)] text-[var(--color-on-error)] w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-on-surface)] transition-colors"
+          className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-white tactile-button transition-colors"
           title="Open Secret Manager"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-          </svg>
+          <span className="material-symbols-outlined text-[24px]">key</span>
         </button>
       </div>
     );
@@ -76,19 +74,17 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
       <div className="flex flex-col gap-3">
         <button 
           onClick={() => setIsExpanded(false)}
-          className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-bold font-[family-name:var(--font-code-sm)] text-2xl w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-surface)] transition-colors"
+          className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#facc15] hover:text-black tactile-button transition-colors font-bold text-2xl"
           title="Close Toolbox"
         >
           -
         </button>
         <button 
           onClick={() => onOpenSecretManager?.()}
-          className="bg-[var(--color-inverse-surface)] text-[var(--color-on-error)] w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-on-surface)] transition-colors"
+          className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-white tactile-button transition-colors"
           title="Open Secret Manager"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-          </svg>
+          <span className="material-symbols-outlined text-[24px]">key</span>
         </button>
       </div>
 

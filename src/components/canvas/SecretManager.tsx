@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 
+let cachedCredentials: any[] | null = null;
+
 export default function SecretManager({ onClose }: { onClose: () => void }) {
-  const [credentials, setCredentials] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [credentials, setCredentials] = useState<any[]>(cachedCredentials || []);
+  const [isLoading, setIsLoading] = useState(cachedCredentials === null);
   const [searchQuery, setSearchQuery] = useState('');
   
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -14,11 +16,18 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
   const [newType, setNewType] = useState('openai');
 
   const fetchCredentials = async () => {
+    if (cachedCredentials) {
+      setCredentials(cachedCredentials);
+      setIsLoading(false);
+      return;
+    }
+    
     setIsLoading(true);
     try {
       const res = await fetch('/api/credentials');
       const data = await res.json();
       if (Array.isArray(data)) {
+        cachedCredentials = data;
         setCredentials(data);
       }
     } catch (e) {
@@ -36,7 +45,9 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
     if (!confirm('Are you sure you want to delete this secret? This action cannot be undone.')) return;
     try {
       await fetch(`/api/credentials?id=${id}`, { method: 'DELETE' });
-      setCredentials(prev => prev.filter(c => c.id !== id));
+      const newCreds = credentials.filter(c => c.id !== id);
+      setCredentials(newCreds);
+      cachedCredentials = newCreds;
     } catch (e) {
       console.error(e);
     }
@@ -56,7 +67,9 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
       });
       const updated = await res.json();
       if (updated.id) {
-        setCredentials(prev => prev.map(c => c.id === id ? updated : c));
+        const newCreds = credentials.map(c => c.id === id ? updated : c);
+        setCredentials(newCreds);
+        cachedCredentials = newCreds;
       }
     } catch (e) {
       console.error(e);
@@ -76,7 +89,9 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
       });
       const added = await res.json();
       if (added.id) {
-        setCredentials(prev => [added, ...prev]);
+        const newCreds = [added, ...credentials];
+        setCredentials(newCreds);
+        cachedCredentials = newCreds;
         setIsCreating(false);
         setNewName('');
         setNewKey('');
@@ -205,8 +220,7 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
             {/* Column Headers */}
             <div className="flex px-[var(--spacing-gutter-sm)] py-1 font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] text-[var(--color-on-primary-container)] border-b-2 border-[var(--color-on-primary-fixed-variant)]">
               <div className="w-1/3">PROVIDER</div>
-              <div className="w-1/3">KEY_NAME</div>
-              <div className="w-1/6 text-center">STATUS</div>
+              <div className="w-1/2">KEY_NAME</div>
               <div className="w-1/6 text-right">ACTIONS</div>
             </div>
 
@@ -226,7 +240,7 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
                     {cred.type.replace('_', ' ')}
                   </div>
                   
-                  <div className="w-1/3 font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface-variant)] pr-2">
+                  <div className="w-1/2 font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface-variant)] pr-2">
                     {editingId === cred.id ? (
                       <input
                         type="text"
@@ -242,13 +256,6 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
                     ) : (
                       cred.name
                     )}
-                  </div>
-
-                  <div className="w-1/6 flex justify-center">
-                    <div className="bg-[#1A1A1A] border-2 border-[var(--color-on-surface)] px-2 py-1 flex items-center gap-1 rounded-sm">
-                      <div className="w-2 h-2 rounded-full bg-[var(--color-tertiary-fixed-dim)]" style={{ boxShadow: '0 0 4px var(--color-tertiary-fixed)' }}></div>
-                      <span className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] text-[var(--color-tertiary-fixed)]">ACTIVE</span>
-                    </div>
                   </div>
 
                   <div className="w-1/6 flex justify-end gap-1">

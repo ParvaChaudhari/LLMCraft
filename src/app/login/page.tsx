@@ -56,22 +56,8 @@ export default function LoginPage() {
           <div className="flex flex-col items-center gap-[var(--spacing-gutter-sm)] text-center border-b-2 border-[var(--color-on-surface-variant)] pb-[var(--spacing-gutter-sm)]">
             <span className="material-symbols-outlined text-4xl text-[var(--color-on-surface)] mb-2" style={{ fontVariationSettings: "'FILL' 1" }}>terminal</span>
             <h1 className="font-[family-name:var(--font-headline-lg)] text-[length:var(--text-headline-lg)] font-bold text-[var(--color-on-surface)] tracking-tighter uppercase">LLMCRAFT_OS</h1>
-            <p className="font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-medium text-[var(--color-on-surface-variant)] bg-[var(--color-surface-container-lowest)] px-2 py-1 border border-[var(--color-on-surface-variant)]">
-              STATION_01 ACCESS
-            </p>
           </div>
 
-          {/* Status Chips */}
-          <div className="flex justify-between w-full font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold uppercase">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 bg-[var(--color-error)] rounded-full inline-block shadow-[1px_1px_0px_0px_var(--color-on-background)]"></span>
-              <span className="text-[var(--color-on-surface-variant)]">STATION STATUS: OFFLINE</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 bg-[var(--color-tertiary)] rounded-full inline-block shadow-[1px_1px_0px_0px_var(--color-on-background)]"></span>
-              <span className="text-[var(--color-on-surface-variant)]">ENCRYPTION: ENABLED</span>
-            </div>
-          </div>
 
           {/* Form Section */}
           <form className="flex flex-col gap-[var(--spacing-gutter-md)]" onSubmit={handleAuth}>
@@ -147,10 +133,7 @@ export default function LoginPage() {
       </main>
 
       {/* Footer */}
-      <footer className="fixed bottom-0 w-full bg-[var(--color-inverse-surface)] border-t-2 border-[var(--color-outline-variant)] px-[var(--spacing-gutter-md)] py-[var(--spacing-gutter-xs)] flex justify-between items-center z-40 text-[var(--color-on-secondary-fixed-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-medium">
-        <span className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold text-[var(--color-tertiary-fixed)] uppercase">
-          (C) 1994 LLMCRAFT SYSTEMS - ENCRYPTION ENABLED
-        </span>
+      <footer className="fixed bottom-0 w-full bg-[var(--color-inverse-surface)] border-t-2 border-[var(--color-outline-variant)] px-[var(--spacing-gutter-md)] py-[var(--spacing-gutter-xs)] flex justify-end items-center z-40 text-[var(--color-on-secondary-fixed-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-medium">
         <div className="flex gap-[var(--spacing-gutter-md)]">
           <span className="hover:text-[var(--color-tertiary-fixed-dim)] underline cursor-pointer">HELP</span>
           <span className="hover:text-[var(--color-tertiary-fixed-dim)] underline cursor-pointer">LEGAL</span>

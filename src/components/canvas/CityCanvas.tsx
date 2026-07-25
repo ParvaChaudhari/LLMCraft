@@ -431,43 +431,67 @@ export default function CityCanvas() {
       </div>
 
       {/* Top right Buttons */}
-      <div className="absolute top-4 right-4 z-10 flex gap-2">
-        <div className="bg-[#2d2d2d] rounded-lg p-1 flex shadow-lg border border-[#444]">
+      <div className="absolute top-4 right-4 z-10 flex gap-4 items-center">
+        {/* Hardware Slider Toggle */}
+        <div 
+          className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-64 h-12 cursor-pointer"
+          onClick={() => setVisualMode(visualMode === 'roads' ? 'pipes' : 'roads')}
+        >
+          {/* Sliding Block */}
+          <div 
+            className={`absolute h-10 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+              visualMode === 'pipes' ? 'left-[calc(50%+2px)]' : 'left-1'
+            }`}
+          />
+          {/* Labels */}
+          <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] uppercase pointer-events-none select-none">
+            <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'roads' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+              <span className="material-symbols-outlined text-[16px]">domain</span>
+              CITY
+            </div>
+            <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'pipes' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+              <span className="material-symbols-outlined text-[16px]">account_tree</span>
+              DATA
+            </div>
+          </div>
+        </div>
+        
+        {/* Actions */}
+        <div className="flex gap-3 ml-2">
           <button
-            onClick={() => setVisualMode('roads')}
-            className={`px-4 py-1 text-sm font-bold rounded-md transition-colors ${visualMode === 'roads' ? 'bg-[#4af626] text-black' : 'text-white hover:bg-[#333]'}`}
+            onClick={handleSave}
+            disabled={isSaving}
+            className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-tertiary-fixed)] hover:text-[var(--color-on-background)] tactile-button transition-colors disabled:opacity-50 group"
+            title="Save Layout"
           >
-            City Mode
+            {isSaving ? (
+              <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+            ) : (
+              <span className="material-symbols-outlined text-[24px]">save</span>
+            )}
           </button>
           <button
-            onClick={() => setVisualMode('pipes')}
-            className={`px-4 py-1 text-sm font-bold rounded-md transition-colors ${visualMode === 'pipes' ? 'bg-[#06b6d4] text-white' : 'text-white hover:bg-[#333]'}`}
+            onClick={handleRun}
+            disabled={isRunning}
+            className={`w-12 h-12 flex items-center justify-center tactile-button transition-colors disabled:opacity-50 ${
+              isRunning ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]' : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)]'
+            }`}
+            title="Run Pipeline"
           >
-            Pipeline
+            {isRunning ? (
+              <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+            ) : (
+              <span className="material-symbols-outlined text-[24px]">play_arrow</span>
+            )}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-error-container)] hover:text-[var(--color-on-error-container)] tactile-button transition-colors"
+            title="Logout"
+          >
+            <span className="material-symbols-outlined text-[24px]">logout</span>
           </button>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={isSaving}
-          className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg transition-colors"
-        >
-          {isSaving ? 'Saving...' : 'Save'}
-        </button>
-        <button
-          onClick={handleRun}
-          disabled={isRunning}
-          className={`px-6 py-2 text-white font-bold rounded-lg shadow-lg transition-colors ${
-            isRunning ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
-          }`}
-        >
-          {isRunning ? 'Running...' : 'Run'}
-        </button>
-        <button
-          onClick={handleLogout}
-          className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg shadow-lg transition-colors"
-        >
-          Logout
-        </button>
       </div>
 
       {/* Sliding Side Panel */}
