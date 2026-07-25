@@ -15,7 +15,7 @@ export default function ConditionalNode({ id, data, selected }: { id: string, da
       </div>
 
       <Handle type="source" position={Position.Right} id="true" className="w-2 h-2 bg-green-500 border-none rounded-full z-10" style={{ right: 64, top: 64 }} />
-      <Handle type="source" position={Position.Right} id="false" className="w-2 h-2 bg-red-500 border-none rounded-full z-10" style={{ right: 64, top: 16 }} />
+      <Handle type="source" position={Position.Right} id="false" className="w-2 h-2 bg-red-500 border-none rounded-full z-10" style={{ right: 64, top: 32 }} />
     </div>
   );
 }

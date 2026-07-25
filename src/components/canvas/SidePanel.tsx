@@ -22,9 +22,9 @@ const JsonNode = ({ keyName, value, path, onInsert }: any) => {
 
   if (isObject) {
     return (
-      <div className="ml-2 border-l-2 border-[#333] pl-2 my-1 font-mono text-sm">
+      <div className="ml-2 border-l-2 border-[var(--color-on-surface-variant)] pl-2 my-1 font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface)]">
         <div
-          className="cursor-pointer hover:bg-[#333] inline-block px-1 text-blue-400 font-bold"
+          className="cursor-pointer hover:bg-[var(--color-surface)] inline-block px-1 font-bold transition-colors"
           onClick={() => setExpanded(!expanded)}
         >
           {expanded ? '▼' : '▶'} {keyName}
@@ -48,13 +48,13 @@ const JsonNode = ({ keyName, value, path, onInsert }: any) => {
 
   // Primitive value
   return (
-    <div className="ml-4 my-1 flex items-start group font-mono text-sm relative pr-10">
-      <span className="text-orange-400 font-bold mr-2 whitespace-nowrap">{keyName}:</span>
-      <span className="text-green-300 break-words">{String(value)}</span>
+    <div className="ml-4 my-1 flex items-start group font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface)] relative pr-10">
+      <span className="font-bold mr-2 whitespace-nowrap">{keyName}:</span>
+      <span className="break-words">{String(value)}</span>
       {onInsert && (
         <button
           onClick={() => onInsert(path)}
-          className="absolute right-0 top-0 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 rounded-sm hover:bg-[#3ade1d] transition-opacity"
+          className="absolute right-0 -top-1 opacity-0 group-hover:opacity-100 bg-[var(--color-tertiary-fixed)] text-[var(--color-on-background)] hover:bg-[#3ade1d] w-5 h-5 flex items-center justify-center font-bold text-sm rounded-sm transition-all tactile-button z-20"
           title="Insert Variable"
         >
           +
@@ -82,6 +82,7 @@ const toolAssets: Record<string, string> = {
   apify: 'drone_hub.png',
   bankVault: 'bank-vault.png',
   artStudio: 'art_studio.png',
+  jsonParser: 'sorting_facility.png',
 };
 
 export default function SidePanel({
@@ -128,10 +129,22 @@ export default function SidePanel({
     return (
       <button
         onClick={() => toggleTab(id)}
-        className={`px-6 py-2 font-bold uppercase tracking-widest text-sm border-[4px] border-[#1a1a1a] border-b-0 transition-colors ${isActive ? 'bg-[#d8c8b8] text-[#1a1a1a]' : 'bg-[#1a1a1a] text-gray-500 hover:text-gray-300'
+        className={`relative px-6 py-2 font-bold font-[family-name:var(--font-code-sm)] text-sm uppercase tracking-widest tactile-button transition-all duration-150 ease-out border-b-0 flex items-center justify-center gap-2 ${isActive
+          ? 'bg-[var(--color-surface)] text-[var(--color-on-surface)] z-10 shadow-none translate-y-[2px]'
+          : 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)] hover:bg-[var(--color-surface-container-highest)] shadow-[0_4px_0_0_rgba(0,0,0,0.8)] -translate-y-[4px]'
           }`}
       >
-        {label}
+
+        <div className={`w-2 h-2 rounded-full transition-all duration-300 shrink-0 ${isActive ? 'bg-[var(--color-tertiary-fixed)] shadow-[0_0_6px_var(--color-tertiary-fixed)]' : 'bg-[#1a1a1a] shadow-inner'}`} />
+        <span className="mt-1">{label}</span>
+
+        {/* Gold Connector Pins (visible when popped up) */}
+        <div className={`absolute -bottom-[8px] left-1/2 -translate-x-1/2 w-12 h-[6px] bg-[#d4af37] border border-black flex justify-around px-[1px] pt-[1px] transition-opacity duration-150 -z-10 ${isActive ? 'opacity-0' : 'opacity-100'}`}>
+          <div className="w-[2px] h-full bg-black/40"></div>
+          <div className="w-[2px] h-full bg-black/40"></div>
+          <div className="w-[2px] h-full bg-black/40"></div>
+          <div className="w-[2px] h-full bg-black/40"></div>
+        </div>
       </button>
     );
   };
@@ -351,7 +364,7 @@ export default function SidePanel({
 
     if (parsedJson && typeof parsedJson === 'object') {
       return (
-        <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
+        <div className="bg-transparent text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] flex-1 overflow-y-auto custom-scrollbar mr-4">
           {Object.entries(parsedJson).map(([k, v]) => (
             <JsonNode
               key={k}
@@ -366,19 +379,19 @@ export default function SidePanel({
     }
 
     return (
-      <div className="flex-1 flex flex-col relative group">
+      <div className="flex-1 flex flex-col relative group mr-4">
         <textarea
           readOnly
-          className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4"
+          className="flex-1 w-full bg-transparent text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] resize-none outline-none custom-scrollbar"
           value={outputData || 'No output generated yet.'}
         />
         {outputData && (
           <button
             onClick={() => handleInsertVariable(node.id)}
-            className="absolute top-0 right-4 opacity-0 group-hover:opacity-100 bg-[#4af626] text-black text-xs font-bold px-2 py-1 rounded-sm hover:bg-[#3ade1d] transition-opacity"
-            title="Insert Variable"
+            className="absolute -top-[5px] -right-4 opacity-0 group-hover:opacity-100 bg-[var(--color-tertiary-fixed)] text-[var(--color-on-background)] hover:bg-[#3ade1d] w-6 h-6 flex items-center justify-center font-bold text-lg rounded-sm transition-all tactile-button z-20"
+            title="Insert Output String"
           >
-            + Insert String
+            +
           </button>
         )}
       </div>
@@ -386,38 +399,35 @@ export default function SidePanel({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-8 pointer-events-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[var(--color-on-surface)]/80 backdrop-blur-sm p-[var(--spacing-gutter-md)] pointer-events-auto">
+      <div className="absolute inset-0 scanline z-0 pointer-events-none opacity-20"></div>
 
       {/* Main Modal Container */}
       <div
-        className="w-[95%] max-w-[1600px] h-[85vh] bg-[#2d2d2d] border-[4px] border-[#1a1a1a] flex flex-col shadow-2xl relative"
-        style={{ boxShadow: '8px 8px 0px rgba(0,0,0,0.5)' }}
+        className="w-[100%] max-w-[1600px] h-[95vh] bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative z-10"
       >
 
         {/* Header Bar */}
-        <div className="h-12 bg-[#1a1a1a] flex justify-between items-center px-4 border-b-[4px] border-[#1a1a1a]">
-          <div className="flex items-center space-x-4">
-            <span className="text-[#c4b4a4] font-bold tracking-widest uppercase">
+        <div className="h-10 bg-[var(--color-inverse-surface)] flex justify-between items-center px-[var(--spacing-gutter-sm)] border-b-2 border-[var(--color-on-surface)] relative overflow-hidden">
+          <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
+          <div className="flex items-center space-x-4 relative z-10">
+            <span className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] text-xl tracking-widest uppercase flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>settings</span>
               NODE CONFIGURATION // {selectedNode.type}
             </span>
-            <div className="flex space-x-2">
-              <span className="text-green-500 font-bold text-xs uppercase flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> STATUS: ONLINE
-              </span>
-            </div>
           </div>
-          <button onClick={onClose} className="text-red-500 hover:text-red-400 font-bold text-xl px-2 bg-[#2d2d2d] border-2 border-[#1a1a1a]">
-            X
+          <button onClick={onClose} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10 p-2">
+            <span className="material-symbols-outlined text-[24px]">close</span>
           </button>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 flex flex-row overflow-hidden p-4 gap-4 bg-[#3d3d3d]">
+        <div className="flex-1 flex flex-row overflow-hidden p-[var(--spacing-gutter-md)] gap-[var(--spacing-gutter-md)] bg-[var(--color-primary-container)]">
 
           {/* LEFT COLUMN (1/4 Width) - Asset Preview */}
-          <div className="w-1/4 flex flex-col gap-2">
-            <div className="flex-1 bg-[#1a1a1a] border-[4px] border-[#2d2d2d] flex items-center justify-center relative overflow-hidden p-8" style={{
-              backgroundImage: 'linear-gradient(rgba(74, 246, 38, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(74, 246, 38, 0.1) 1px, transparent 1px)',
+          <div className="w-1/4 flex flex-col gap-[var(--spacing-gutter-sm)]">
+            <div className="flex-1 bg-[var(--color-inverse-surface)] inset-input flex items-center justify-center relative overflow-hidden p-8" style={{
+              backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
               backgroundSize: '20px 20px',
               backgroundPosition: 'center center'
             }}>
@@ -425,16 +435,35 @@ export default function SidePanel({
                 <img
                   src={`/assets/${assetName}`}
                   alt={selectedNode.type}
-                  className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(74,246,38,0.3)] hover:scale-105 transition-transform"
+                  className="w-full h-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform"
                 />
               )}
             </div>
 
             {/* Building Stats Panel */}
-            <div className="h-24 bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-3 text-[#4af626] font-mono text-sm leading-tight uppercase flex flex-col justify-center">
+            <div className="bg-[#1a1a1a] inset-input p-[var(--spacing-gutter-sm)] text-[var(--color-tertiary-fixed-dim)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] leading-tight uppercase flex flex-col gap-3 justify-center">
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
-              <div>INTEGRITY: <span className="text-white">100%</span></div>
-              <div>POWER: <span className="text-white">OPTIMAL</span></div>
+
+              {/* Standalone Execute Button */}
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio'].includes(selectedNode.type) && (
+                <button
+                  onClick={executeNodeStandalone}
+                  disabled={isNodeRunning}
+                  className={`w-full py-3 font-bold font-[family-name:var(--font-code-sm)] text-[length:var(--text-label-caps)] uppercase tracking-widest tactile-button transition-colors flex items-center justify-center gap-2 ${isNodeRunning
+                    ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)] opacity-50 cursor-not-allowed border-none'
+                    : 'bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)]'
+                    }`}
+                >
+                  {isNodeRunning ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-[var(--color-on-surface-variant)] border-t-transparent rounded-full animate-spin" />
+                      Running...
+                    </>
+                  ) : (
+                    <> ▶ Execute Node </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -449,13 +478,13 @@ export default function SidePanel({
             </div>
 
             {/* UNIFIED CONTAINER */}
-            <div className="flex-1 bg-[#d8c8b8] border-[4px] border-[#1a1a1a] flex flex-row overflow-hidden relative">
+            <div className="flex-1 bg-[var(--color-primary-container)] bevel-container flex flex-row overflow-hidden relative">
 
               {/* COLUMN 1: INPUT */}
               {activeTabs.includes('input') && (
                 <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Input</h3>
+                  <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] py-1 text-center">
+                    <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Input</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-4">
                     {incomingNodes.length === 0 ? (
@@ -465,9 +494,9 @@ export default function SidePanel({
                     ) : (
                       <div className="space-y-4 h-full flex flex-col">
                         {incomingNodes.map((node: any) => (
-                          <div key={node.id} className="bg-[#1a1a1a] p-4 pr-0 border-[3px] border-[#2d2d2d] flex-1 flex flex-col">
-                            <div className="text-[#4af626] font-bold text-xs uppercase mb-2 mr-4 flex justify-between">
-                              <span>SOURCE: {node.type}</span>
+                          <div key={node.id} className="bg-[var(--color-surface)] px-4 pb-4 pt-5 relative inset-input text-[var(--color-on-surface)] flex-1 flex flex-col">
+                            <div className="absolute top-2 left-4 text-[var(--color-on-surface-variant)] opacity-40 font-bold font-[family-name:var(--font-label-caps)] text-[9px] uppercase pointer-events-none select-none z-10">
+                              FROM: {node.type}
                             </div>
                             {renderInputSource(node)}
                           </div>
@@ -480,22 +509,22 @@ export default function SidePanel({
 
               {/* COLUMN 2: TASKS (Configuration) */}
               {activeTabs.includes('tasks') && (
-                <div className={`flex-1 flex flex-col overflow-hidden ${activeTabs.includes('input') ? 'border-l-[4px] border-[#1a1a1a]' : ''}`}>
-                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Tasks</h3>
+                <div className={`flex-1 flex flex-col overflow-hidden ${activeTabs.includes('input') ? 'border-l-2 border-[var(--color-on-surface)]' : ''}`}>
+                  <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] py-1 text-center">
+                    <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
                     {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault'].includes(selectedNode.type) && (
                       <>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">
                             {selectedNode.type === 'bankVault' ? 'Database Credential (Postgres)' : 'Authentication Credential'}
                           </label>
                           <div className="flex gap-2">
                             <select
                               value={data.credentialId || ''}
                               onChange={(e) => handleChange('credentialId', e.target.value)}
-                              className="flex-1 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                              className="flex-1 inset-input bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] py-1 px-2 outline-none"
                             >
                               <option value="">-- Select Credential --</option>
                               {credentials.map(c => (
@@ -505,28 +534,28 @@ export default function SidePanel({
 
                             <button
                               onClick={() => setShowNewCredForm(!showNewCredForm)}
-                              className="bg-[#2d2d2d] hover:bg-[#1a1a1a] text-[#4af626] border-[3px] border-[#2d2d2d] px-4 font-bold text-xl transition-colors"
+                              className="bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button px-4 py-1 font-bold text-[length:var(--text-code-sm)] transition-colors"
                             >
                               {showNewCredForm ? '-' : '+'}
                             </button>
                           </div>
 
                           {showNewCredForm && (
-                            <div className="mt-2 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] space-y-4">
-                              <h4 className="text-[#c4b4a4] font-bold text-xs uppercase tracking-widest border-b border-[#333] pb-2">Create New Credential</h4>
+                            <div className="mt-2 p-4 bg-[var(--color-inverse-surface)] inset-input space-y-4">
+                              <h4 className="text-[var(--color-inverse-primary)] font-bold text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] uppercase tracking-widest border-b border-[var(--color-on-surface)] pb-2">Create New Credential</h4>
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-400">Credential Name</label>
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">Credential Name</label>
                                 <input
                                   type="text"
                                   value={newCredName}
                                   onChange={(e) => setNewCredName(e.target.value)}
                                   placeholder="e.g. My Personal API Key"
                                   autoComplete="off"
-                                  className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                                 />
                               </div>
                               <div>
-                                <label className="block text-xs font-bold mb-1 text-gray-400">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">
                                   {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : 'API Key'}
                                 </label>
                                 <input
@@ -535,13 +564,13 @@ export default function SidePanel({
                                   onChange={(e) => setNewCredKey(e.target.value)}
                                   placeholder={getCredentialProvider(selectedNode.type) === 'postgres' ? "postgresql://user:password@host/db" : "sk-..."}
                                   autoComplete="new-password"
-                                  className="w-full bg-[#2d2d2d] text-white p-2 border-2 border-[#333] outline-none font-mono text-sm"
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                                 />
                               </div>
                               <button
                                 onClick={handleCreateCredential}
                                 disabled={!newCredName || !newCredKey || isSavingCred}
-                                className="w-full bg-[#4af626] hover:bg-[#3ade1d] text-black font-bold py-2 px-4 uppercase tracking-wider disabled:opacity-50"
+                                className="w-full bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)] font-bold py-2 px-4 uppercase tracking-wider tactile-button disabled:opacity-50"
                               >
                                 {isSavingCred ? 'Saving...' : 'Save & Select'}
                               </button>
@@ -551,7 +580,7 @@ export default function SidePanel({
                         {LLM_NODE_TYPES.includes(selectedNode.type) && (
                           <>
                             <div>
-                              <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a] flex justify-between items-center">
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)] flex justify-between items-center">
                                 <span>AI Model Version</span>
                                 {LLM_NODE_TYPES.includes(selectedNode.type) && data.credentialId && (
                                   <button
@@ -564,20 +593,20 @@ export default function SidePanel({
                                 )}
                               </label>
                               {isLoadingModels ? (
-                                <div className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] font-bold animate-pulse text-sm">Fetching live models...</div>
+                                <div className="w-full bg-[var(--color-surface-variant)] text-[var(--color-tertiary-fixed-dim)] p-[var(--spacing-gutter-sm)] inset-input font-bold animate-pulse text-sm">Fetching live models...</div>
                               ) : modelsError === 'Credential not found' || !data.credentialId ? (
-                                <div className="w-full bg-[#1a1a1a] text-gray-500 p-3 border-[3px] border-[#2d2d2d] font-mono text-sm">
+                                <div className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)] p-[var(--spacing-gutter-sm)] inset-input font-[family-name:var(--font-code-sm)] text-sm">
                                   Select a valid credential to load models.
                                 </div>
                               ) : modelsError ? (
-                                <div className="w-full bg-[#1a1a1a] text-red-500 p-3 border-[3px] border-red-900 font-bold text-sm">
+                                <div className="w-full bg-[var(--color-error-container)] text-[var(--color-on-error-container)] p-[var(--spacing-gutter-sm)] inset-input font-bold text-sm">
                                   Error: {modelsError}
                                 </div>
                               ) : (
                                 <select
                                   value={data.model || ''}
                                   onChange={(e) => handleChange('model', e.target.value)}
-                                  className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] py-1 px-2 inset-input outline-none font-bold"
                                 >
                                   <option value="">-- Select Model --</option>
                                   {LLM_NODE_TYPES.includes(selectedNode.type) && (
@@ -589,11 +618,11 @@ export default function SidePanel({
                               )}
                             </div>
                             <div>
-                              <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Instruction Prompt</label>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Instruction Prompt</label>
                               <textarea
                                 value={data.prompt || ''}
                                 onChange={(e) => handleChange('prompt', e.target.value)}
-                                className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                                className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-sm resize-y"
                                 placeholder="Summarize this: {{lastOutput}}"
                               />
                             </div>
@@ -610,7 +639,7 @@ export default function SidePanel({
                             <select
                               value={data.method || 'GET'}
                               onChange={(e) => handleChange('method', e.target.value)}
-                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                             >
                               <option value="GET">GET</option>
                               <option value="POST">POST</option>
@@ -624,28 +653,28 @@ export default function SidePanel({
                               type="text"
                               value={data.url || ''}
                               onChange={(e) => handleChange('url', e.target.value)}
-                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                               placeholder="https://api.example.com/data"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Headers (JSON)</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Headers (JSON)</label>
                           <textarea
                             value={data.headers || ''}
                             onChange={(e) => handleChange('headers', e.target.value)}
-                            className="w-full h-20 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            className="w-full h-20 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input outline-none resize-y"
                             placeholder='{"Content-Type": "application/json"}'
                           />
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Request Body (JSON)</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Request Body (JSON)</label>
                           <textarea
                             value={data.body || ''}
                             onChange={(e) => handleChange('body', e.target.value)}
-                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input outline-none resize-y"
                             placeholder='{"data": "{{previous_node.value}}"}'
                           />
                         </div>
@@ -655,12 +684,12 @@ export default function SidePanel({
                     {selectedNode.type === 'watchtower' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Search Query</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Search Query</label>
                           <input
                             type="text"
                             value={data.query || ''}
                             onChange={(e) => handleChange('query', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="{{webhook.query}} or 'latest news'"
                           />
                         </div>
@@ -669,11 +698,11 @@ export default function SidePanel({
 
                     {selectedNode.type === 'dbSilo' && (
                       <div className="space-y-2">
-                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">SQL Query (Supports {"{{"}variable{"}}"} interpolation)</label>
+                        <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">SQL Query (Supports {"{{"}variable{"}}"} interpolation)</label>
                         <textarea
                           value={data.query || ''}
                           onChange={(e) => handleChange('query', e.target.value)}
-                          className="w-full h-32 p-4 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono text-sm resize-y outline-none"
+                          className="w-full h-32 p-3 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] inset-input resize-y outline-none"
                           placeholder="SELECT * FROM users WHERE email = '{{lastOutput}}';"
                         />
                       </div>
@@ -681,27 +710,30 @@ export default function SidePanel({
 
                     {selectedNode.type === 'jsonParser' && (
                       <div className="space-y-4">
+                        <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]">
+                          Automatically extracts JSON. No configuration required.
+                        </div>
                       </div>
                     )}
 
                     {selectedNode.type === 'apify' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Actor ID</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Actor ID</label>
                           <input
                             type="text"
                             value={data.actorId || ''}
                             onChange={(e) => handleChange('actorId', e.target.value)}
-                            className="w-full p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono outline-none"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="e.g. apify/instagram-scraper"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">JSON Input Payload</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">JSON Input Payload</label>
                           <textarea
                             value={data.payload || ''}
                             onChange={(e) => handleChange('payload', e.target.value)}
-                            className="w-full h-40 p-3 bg-[#1a1a1a] border-[3px] border-[#2d2d2d] text-[#4af626] font-mono text-sm resize-y outline-none"
+                            className="w-full h-40 p-3 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] inset-input resize-y outline-none"
                             placeholder='{&#10;  "searchTerms": ["{{lastOutput}}"]&#10;}'
                           />
                         </div>
@@ -711,11 +743,11 @@ export default function SidePanel({
                     {selectedNode.type === 'bankVault' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Embedding Credential (AI Provider)</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Embedding Credential (AI Provider)</label>
                           <select
                             value={data.embeddingCredentialId || ''}
                             onChange={(e) => handleChange('embeddingCredentialId', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                           >
                             <option value="">-- Select Embedding Credential --</option>
                             {embeddingCredentials.map(c => (
@@ -725,42 +757,45 @@ export default function SidePanel({
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Mode</label>
-                          <div className="flex border-[3px] border-[#2d2d2d] bg-[#1a1a1a]">
-                            <button
-                              onClick={() => handleChange('mode', 'save')}
-                              className={`flex-1 p-3 text-xs font-bold uppercase transition-colors ${(!data.mode || data.mode === 'save') ? 'bg-[#4af626] text-black' : 'text-gray-400 hover:text-[#4af626]'}`}
-                            >
-                              Save (Upsert)
-                            </button>
-                            <button
-                              onClick={() => handleChange('mode', 'search')}
-                              className={`flex-1 p-3 text-xs font-bold uppercase transition-colors ${(data.mode === 'search') ? 'bg-[#4af626] text-black' : 'text-gray-400 hover:text-[#4af626]'}`}
-                            >
-                              Search (RAG)
-                            </button>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Mode</label>
+                          <div
+                            className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-full h-10 cursor-pointer"
+                            onClick={() => handleChange('mode', (!data.mode || data.mode === 'save') ? 'search' : 'save')}
+                          >
+                            <div
+                              className={`absolute h-8 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${data.mode === 'search' ? 'left-[calc(50%+2px)]' : 'left-1'
+                                }`}
+                            />
+                            <div className="relative z-10 flex w-full h-full text-[length:var(--text-label-caps)] font-bold font-[family-name:var(--font-label-caps)] uppercase pointer-events-none select-none">
+                              <div className={`flex-1 flex items-center justify-center transition-colors ${(!data.mode || data.mode === 'save') ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+                                Save (Upsert)
+                              </div>
+                              <div className={`flex-1 flex items-center justify-center transition-colors ${(data.mode === 'search') ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+                                Search (RAG)
+                              </div>
+                            </div>
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Table Name</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Table Name</label>
                           <input
                             type="text"
                             value={data.tableName || ''}
                             onChange={(e) => handleChange('tableName', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="documents"
                           />
                         </div>
 
                         {data.mode === 'search' && (
                           <div>
-                            <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Match Count Limit</label>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Match Count Limit</label>
                             <input
                               type="number"
                               value={data.matchCount || 3}
                               onChange={(e) => handleChange('matchCount', parseInt(e.target.value))}
-                              className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                               placeholder="3"
                               min="1"
                             />
@@ -772,11 +807,11 @@ export default function SidePanel({
                     {selectedNode.type === 'artStudio' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">API Credential</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">API Credential</label>
                           <select
                             value={data.credentialId || ''}
                             onChange={(e) => handleChange('credentialId', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                           >
                             <option value="">-- Select Credential --</option>
                             {embeddingCredentials.map(c => (
@@ -786,11 +821,11 @@ export default function SidePanel({
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Model Version</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Model Version</label>
                           <select
                             value={data.model || ''}
                             onChange={(e) => handleChange('model', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-3 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                           >
                             <option value="">-- Select Model --</option>
                             <option value="dall-e-3">DALL-E 3 (Requires OpenAI Key)</option>
@@ -801,11 +836,11 @@ export default function SidePanel({
                         </div>
 
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Image Prompt</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Image Prompt</label>
                           <textarea
                             value={data.prompt || ''}
                             onChange={(e) => handleChange('prompt', e.target.value)}
-                            className="w-full h-32 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
                             placeholder="An isometric building based on: {{lastOutput}}"
                           />
                         </div>
@@ -815,11 +850,11 @@ export default function SidePanel({
                     {selectedNode.type === 'customWorkshop' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">JavaScript Code</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">JavaScript Code</label>
                           <textarea
                             value={data.code !== undefined ? data.code : 'return context.lastOutput;'}
                             onChange={(e) => handleChange('code', e.target.value)}
-                            className="w-full h-48 bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm resize-y"
+                            className="w-full h-48 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-3 inset-input resize-y outline-none"
                             spellCheck={false}
                           />
                         </div>
@@ -829,12 +864,12 @@ export default function SidePanel({
                     {selectedNode.type === 'webScraper' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Target URL</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Target URL</label>
                           <input
                             type="text"
                             value={data.url || ''}
                             onChange={(e) => handleChange('url', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="https://example.com or {{webhook.url}}"
                           />
                         </div>
@@ -844,7 +879,7 @@ export default function SidePanel({
                     {selectedNode.type === 'documentParser' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Document File</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Document File</label>
                           <div className="relative">
                             <input
                               type="file"
@@ -876,10 +911,10 @@ export default function SidePanel({
                               }}
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />
-                            <div className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] text-center font-bold uppercase transition-colors hover:bg-[#2d2d2d] flex items-center justify-center gap-2">
+                            <div className="w-full bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button py-2 px-4 text-center font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold uppercase transition-colors flex items-center justify-center gap-2">
                               {data.isUploading ? (
                                 <>
-                                  <div className="w-4 h-4 border-2 border-[#4af626] border-t-transparent rounded-full animate-spin" />
+                                  <div className="w-4 h-4 border-2 border-[var(--color-on-surface)] border-t-transparent rounded-full animate-spin" />
                                   Uploading...
                                 </>
                               ) : (
@@ -888,7 +923,7 @@ export default function SidePanel({
                             </div>
                           </div>
                           {data.fileName && (
-                            <div className="mt-2 text-xs font-bold text-[#1a1a1a] bg-[#d8c8b8] p-2 border-[2px] border-[#2d2d2d] truncate">
+                            <div className="mt-2 text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold text-[var(--color-on-primary-container)] bg-[var(--color-primary-container)] p-2 bevel-container truncate">
                               Selected: {data.fileName}
                             </div>
                           )}
@@ -903,12 +938,12 @@ export default function SidePanel({
 
                     {selectedNode.type === 'delay' && (
                       <div>
-                        <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Wait Duration (ms)</label>
+                        <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Wait Duration (ms)</label>
                         <input
                           type="number"
                           value={data.delayMs || 5000}
                           onChange={(e) => handleChange('delayMs', parseInt(e.target.value))}
-                          className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                          className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                           placeholder="5000"
                         />
                       </div>
@@ -917,21 +952,21 @@ export default function SidePanel({
                     {selectedNode.type === 'conditional' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Condition Variable</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Condition Variable</label>
                           <input
                             type="text"
                             value={data.conditionLhs ?? '{{lastOutput}}'}
                             onChange={(e) => handleChange('conditionLhs', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="{{lastOutput}}"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Operator</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Operator</label>
                           <select
                             value={data.conditionOperator || 'contains'}
                             onChange={(e) => handleChange('conditionOperator', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-bold"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                           >
                             <option value="contains">Contains</option>
                             <option value="is_equal_to">Is Equal To</option>
@@ -941,12 +976,12 @@ export default function SidePanel({
                           </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Compare Value</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Compare Value</label>
                           <input
                             type="text"
                             value={data.conditionRhs ?? 'error'}
                             onChange={(e) => handleChange('conditionRhs', e.target.value)}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="error"
                           />
                         </div>
@@ -956,22 +991,22 @@ export default function SidePanel({
                     {selectedNode.type === 'limit' && (
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Max Items / Passes</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Max Items / Passes</label>
                           <input
                             type="number"
                             value={data.maxItems || 1}
                             onChange={(e) => handleChange('maxItems', parseInt(e.target.value))}
-                            className="w-full bg-[#1a1a1a] text-[#4af626] p-4 border-[3px] border-[#2d2d2d] outline-none font-mono text-sm"
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="1"
                             min="1"
                           />
                         </div>
                         <div>
-                          <label className="block text-sm font-bold mb-2 uppercase text-[#1a1a1a]">Keep</label>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Keep</label>
                           <select
                             disabled
                             value="first_items"
-                            className="w-full bg-[#1a1a1a] text-gray-500 p-4 border-[3px] border-[#2d2d2d] outline-none font-bold opacity-50 cursor-not-allowed"
+                            className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold opacity-50 cursor-not-allowed"
                           >
                             <option value="first_items">First Items</option>
                           </select>
@@ -980,37 +1015,15 @@ export default function SidePanel({
                     )}
 
                     {selectedNode.type === 'webhook' && (
-                      <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                        <div className="animate-pulse">● LISTENING FOR TRIGGER</div>
+                      <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">
+                        <div>LISTENING FOR TRIGGER</div>
                       </div>
                     )}
 
-                    {/* Standalone Execute Button */}
-                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio'].includes(selectedNode.type) && (
-                      <div className="pt-4 border-t-2 border-[#1a1a1a] mt-4">
-                        <button
-                          onClick={executeNodeStandalone}
-                          disabled={isNodeRunning}
-                          className={`w-full py-3 font-bold text-sm uppercase tracking-widest border-[3px] transition-colors flex items-center justify-center gap-2 ${isNodeRunning
-                              ? 'bg-[#1a1a1a] text-gray-500 border-[#2d2d2d] cursor-not-allowed'
-                              : 'bg-[#4af626] hover:bg-[#3ade1d] text-black border-[#3ade1d] hover:border-[#2ac514]'
-                            }`}
-                        >
-                          {isNodeRunning ? (
-                            <>
-                              <div className="w-3 h-3 border-2 border-gray-500 border-t-transparent rounded-full animate-spin" />
-                              Running...
-                            </>
-                          ) : (
-                            <> ▶ Execute Node </>
-                          )}
-                        </button>
-                      </div>
-                    )}
 
                     {selectedNode.type === 'output' && (
-                      <div className="bg-[#1a1a1a] p-6 border-[3px] border-[#2d2d2d] text-center text-[#4af626] font-mono">
-                        <div className="text-orange-500 font-bold">» END OF LINE «</div>
+                      <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">
+                        <div>END OF LINE</div>
                       </div>
                     )}
                   </div>
@@ -1019,29 +1032,31 @@ export default function SidePanel({
 
               {/* COLUMN 3: LOGS */}
               {activeTabs.includes('logs') && (
-                <div className={`flex-1 flex flex-col overflow-hidden ${(activeTabs.includes('input') || activeTabs.includes('tasks')) ? 'border-l-[4px] border-[#1a1a1a]' : ''}`}>
-                  <div className="bg-[#1a1a1a] border-b-[4px] border-[#1a1a1a] py-3 text-center">
-                    <h3 className="text-[#c4b4a4] font-bold uppercase tracking-widest">Logs</h3>
+                <div className={`flex-1 flex flex-col overflow-hidden ${(activeTabs.includes('input') || activeTabs.includes('tasks')) ? 'border-l-2 border-[var(--color-on-surface)]' : ''}`}>
+                  <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] py-1 text-center">
+                    <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Output Logs</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto">
-                    <div className="h-full bg-[#1a1a1a] border-[4px] border-[#2d2d2d] p-4 pr-0 flex flex-col relative">
-                      <div className="text-[#4af626] font-bold text-xs uppercase mb-2 border-b border-[#333] pb-2 mr-4 flex justify-between items-center">
-                        <span>SYSTEM OUTPUT</span>
-                        <div className="flex items-center gap-4">
-                          {data.output && (
-                            <button
-                              onClick={() => setViewAsJson(!viewAsJson)}
-                              className={`px-3 py-1 text-[10px] font-bold border-2 transition-colors ${viewAsJson
-                                  ? 'bg-[#4af626] text-black border-[#4af626]'
-                                  : 'bg-transparent text-gray-400 border-gray-600 hover:text-white hover:border-gray-400'
-                                }`}
-                            >
+                    <div className="h-full bg-[var(--color-surface)] inset-input p-[var(--spacing-gutter-md)] text-[var(--color-on-surface)] flex flex-col relative">
+                      {data.output && (
+                        <div
+                          className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-36 h-8 cursor-pointer mb-4 shrink-0 self-end"
+                          onClick={() => setViewAsJson(!viewAsJson)}
+                        >
+                          <div
+                            className={`absolute h-6 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${viewAsJson ? 'left-[calc(50%+2px)]' : 'left-1'
+                              }`}
+                          />
+                          <div className="relative z-10 flex w-full h-full text-[length:var(--text-label-caps)] font-bold font-[family-name:var(--font-label-caps)] uppercase pointer-events-none select-none">
+                            <div className={`flex-1 flex items-center justify-center transition-colors ${!viewAsJson ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+                              RAW
+                            </div>
+                            <div className={`flex-1 flex items-center justify-center transition-colors ${viewAsJson ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
                               JSON
-                            </button>
-                          )}
-                          <span className="text-gray-500">READY</span>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       {data.output ? (
                         viewAsJson ? (() => {
                           let parsedJson = null;
@@ -1056,7 +1071,7 @@ export default function SidePanel({
 
                           if (parsedJson && typeof parsedJson === 'object') {
                             return (
-                              <div className="bg-transparent text-white font-mono text-sm flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                              <div className="bg-transparent font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] flex-1 overflow-y-auto pr-2 custom-scrollbar">
                                 {Object.entries(parsedJson).map(([k, v]) => (
                                   <JsonNode
                                     key={k}
@@ -1087,13 +1102,13 @@ export default function SidePanel({
                           })() : (
                             <textarea
                               readOnly
-                              className="flex-1 w-full bg-transparent text-white font-mono text-sm resize-none outline-none pr-4 custom-scrollbar"
+                              className="flex-1 w-full bg-transparent font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] resize-none outline-none pr-4 custom-scrollbar"
                               value={data.output}
                             />
                           )
                         )
                       ) : (
-                        <div className="flex-1 flex items-center justify-center flex-col text-gray-600 font-mono text-sm">
+                        <div className="flex-1 flex items-center justify-center flex-col text-[var(--color-on-surface-variant)] font-mono text-sm">
                           <div className="animate-bounce mb-2">_</div>
                           Waiting for execution...
                         </div>
