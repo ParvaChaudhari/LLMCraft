@@ -52,16 +52,14 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
       <div className="absolute top-4 left-4 z-10 flex flex-col gap-3">
         <button 
           onClick={() => setIsExpanded(true)}
-          className="bg-[#d8c8b8] text-[#2d2d2d] font-bold text-2xl w-12 h-12 flex items-center justify-center border-[3px] border-[#2d2d2d] hover:bg-[#c4b29f] transition-colors"
-          style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}
+          className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-bold font-[family-name:var(--font-code-sm)] text-2xl w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-surface)] transition-colors"
           title="Open Toolbox"
         >
           +
         </button>
         <button 
           onClick={() => onOpenSecretManager?.()}
-          className="bg-[#2d2d2d] text-[#e0e0e0] font-bold text-xl w-12 h-12 flex items-center justify-center border-[3px] border-[#1a1a1a] hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}
+          className="bg-[var(--color-inverse-surface)] text-[var(--color-on-error)] w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-on-surface)] transition-colors"
           title="Open Secret Manager"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -78,16 +76,14 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
       <div className="flex flex-col gap-3">
         <button 
           onClick={() => setIsExpanded(false)}
-          className="bg-[#d8c8b8] text-[#2d2d2d] font-bold text-2xl w-12 h-12 flex items-center justify-center border-[3px] border-[#2d2d2d] hover:bg-[#c4b29f] transition-colors"
-          style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}
+          className="bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)] font-bold font-[family-name:var(--font-code-sm)] text-2xl w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-surface)] transition-colors"
           title="Close Toolbox"
         >
           -
         </button>
         <button 
           onClick={() => onOpenSecretManager?.()}
-          className="bg-[#2d2d2d] text-[#e0e0e0] font-bold text-xl w-12 h-12 flex items-center justify-center border-[3px] border-[#1a1a1a] hover:bg-[#3d3d3d] transition-colors"
-          style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}
+          className="bg-[var(--color-inverse-surface)] text-[var(--color-on-error)] w-12 h-12 flex items-center justify-center tactile-button hover:bg-[var(--color-on-surface)] transition-colors"
           title="Open Secret Manager"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -96,85 +92,93 @@ export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?:
         </button>
       </div>
 
-      <div className="bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d]" style={{ boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' }}>
-        <div className="flex flex-col mb-4 border-b-2 border-[#2d2d2d] pb-4 gap-3">
-          <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Projects</h3>
-          <input
-            type="text"
-            placeholder="Search assets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#2d2d2d] text-white p-2 border-[3px] border-[#1a1a1a] outline-none font-mono text-sm placeholder-gray-500 focus:border-[#4af626] transition-colors"
-          />
-        </div>
-      <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
-        {toolItems
-          .filter(item => 
-            item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-            item.description.toLowerCase().includes(searchQuery.toLowerCase())
-          )
-          .map(item => (
-          <div
-            key={item.type}
-            className="bg-[#2d2d2d] text-[#e0e0e0] border-2 border-[#1a1a1a] px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[#3d3d3d] transition-colors"
-            style={{ boxShadow: '2px 2px 0px 0px rgba(0,0,0,0.5)' }}
-            onDragStart={(event) => onDragStart(event, item.type)}
-            onDragEnd={onDragEnd}
-            onMouseEnter={(e) => {
-              if (typeof window !== 'undefined') {
-                const maxTop = window.innerHeight - 450;
-                setPreviewY(Math.min(Math.max(16, e.clientY - 120), maxTop));
-              } else {
-                setPreviewY(e.clientY - 120);
-              }
-              setSelectedTool(item.type);
-            }}
-            onMouseMove={(e) => {
-              if (typeof window !== 'undefined') {
-                const maxTop = window.innerHeight - 450;
-                setPreviewY(Math.min(Math.max(16, e.clientY - 120), maxTop));
-              } else {
-                setPreviewY(e.clientY - 120);
-              }
-            }}
-            onMouseLeave={() => setSelectedTool(null)}
-            draggable
-          >
-            <div className="font-bold" style={{ color: item.color }}>{item.icon} {item.name}</div>
-            <div className="text-xs text-gray-400 mt-1">{item.description}</div>
+      <div className="bg-[var(--color-primary-container)] p-4 w-72 bevel-container flex flex-col gap-4">
+        <div className="flex flex-col gap-3 border-b-2 border-[var(--color-on-surface-variant)] pb-4">
+          <h3 className="font-bold font-[family-name:var(--font-code-sm)] text-lg text-[var(--color-on-surface)] uppercase tracking-widest">Projects</h3>
+          <div className="relative w-full">
+            <span className="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[var(--color-on-surface-variant)] z-10" style={{ fontSize: '16px' }}>search</span>
+            <input
+              type="text"
+              placeholder="Search assets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] pl-8 pr-2 py-1 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] placeholder-[var(--color-outline)] focus:border-[var(--color-tertiary-fixed)] transition-colors"
+            />
           </div>
-        ))}
-      </div>
-
-      {/* Asset Preview Panel */}
-      {selectedTool && (() => {
-        const item = toolItems.find(t => t.type === selectedTool);
-        return item ? (
-          <div 
-            className="fixed left-[320px] z-50 bg-[#d8c8b8] p-4 w-72 border-[3px] border-[#2d2d2d] pointer-events-none transition-all duration-75 ease-out" 
-            style={{ 
-              top: Math.max(16, previewY),
-              boxShadow: '4px 4px 0px 0px rgba(0,0,0,0.5)' 
-            }}
-          >
-            <div className="flex justify-between items-center mb-4 border-b-2 border-[#2d2d2d] pb-2">
-              <h3 className="text-lg font-bold text-[#2d2d2d] uppercase tracking-widest">Asset Preview</h3>
+        </div>
+        
+        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+          {toolItems
+            .filter(item => 
+              item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+              item.description.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map(item => (
+            <div
+              key={item.type}
+              className="bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button px-3 py-2 cursor-grab active:cursor-grabbing hover:bg-[var(--color-surface-container-highest)] transition-colors"
+              onDragStart={(event) => onDragStart(event, item.type)}
+              onDragEnd={onDragEnd}
+              onMouseEnter={(e) => {
+                if (typeof window !== 'undefined') {
+                  const maxTop = window.innerHeight - 450;
+                  setPreviewY(Math.min(Math.max(16, e.clientY - 120), maxTop));
+                } else {
+                  setPreviewY(e.clientY - 120);
+                }
+                setSelectedTool(item.type);
+              }}
+              onMouseMove={(e) => {
+                if (typeof window !== 'undefined') {
+                  const maxTop = window.innerHeight - 450;
+                  setPreviewY(Math.min(Math.max(16, e.clientY - 120), maxTop));
+                } else {
+                  setPreviewY(e.clientY - 120);
+                }
+              }}
+              onMouseLeave={() => setSelectedTool(null)}
+              draggable
+            >
+              <div className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] uppercase font-bold flex gap-2 items-center">
+                <span style={{ color: item.color }}>{item.icon}</span> 
+                {item.name}
+              </div>
+              <div className="font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-[var(--color-on-surface-variant)] mt-1">{item.description}</div>
             </div>
-            <div className="bg-[#2d2d2d] p-4 flex flex-col items-center justify-center border-2 border-[#1a1a1a]" style={{ boxShadow: 'inset 2px 2px 0px 0px rgba(0,0,0,0.5)' }}>
-              <img 
-                src={`/assets/${item.asset}`} 
-                alt={`${item.name} Preview`} 
-                className="w-full object-contain mb-4" 
-                style={{ imageRendering: 'auto' }} 
-              />
-              <div className="text-[#c4b4a4] font-mono text-xs text-center border-t-2 border-[#1a1a1a] pt-4 w-full leading-tight">
+          ))}
+        </div>
+
+        {/* Asset Preview Panel */}
+        {selectedTool && (() => {
+          const item = toolItems.find(t => t.type === selectedTool);
+          return item ? (
+            <div 
+              className="fixed left-[350px] z-50 bg-[var(--color-primary-container)] p-4 w-72 bevel-container pointer-events-none transition-all duration-75 ease-out flex flex-col gap-4" 
+              style={{ top: Math.max(16, previewY) }}
+            >
+              <div className="flex justify-between items-center border-b-2 border-[var(--color-on-surface-variant)] pb-2">
+                <h3 className="font-bold font-[family-name:var(--font-code-sm)] text-lg text-[var(--color-on-surface)] uppercase tracking-widest">Asset Preview</h3>
+              </div>
+              
+              <div className="bg-[var(--color-inverse-surface)] p-4 flex flex-col items-center justify-center inset-input" style={{
+                backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
+                backgroundSize: '10px 10px',
+                backgroundPosition: 'center center'
+              }}>
+                <img 
+                  src={`/assets/${item.asset}`} 
+                  alt={`${item.name} Preview`} 
+                  className="w-full object-contain filter drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" 
+                />
+              </div>
+
+              <div className="text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] text-center leading-tight">
                 {item.longDescription}
               </div>
             </div>
-          </div>
-        ) : null;
-      })()}
-    </div>
+          ) : null;
+        })()}
+      </div>
     </div>
   );
 }

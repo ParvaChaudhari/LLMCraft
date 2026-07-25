@@ -90,7 +90,7 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: 'Pixelify Sans', sans-serif;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 /* Remove default React Flow white boxes from ALL custom nodes */

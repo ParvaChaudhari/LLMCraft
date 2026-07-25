@@ -118,7 +118,7 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
           <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
           <div className="flex items-center gap-[var(--spacing-gutter-sm)] relative z-10">
             <span className="material-symbols-outlined text-[var(--color-inverse-primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>lock</span>
-            <h2 className="font-[family-name:var(--font-headline-md)] text-[length:var(--text-headline-md)] text-[var(--color-inverse-primary)] tracking-tight">SECRET_MANAGER</h2>
+            <h2 className="font-bold font-[family-name:var(--font-code-sm)] text-xl text-[var(--color-inverse-primary)] tracking-tight">SECRET_MANAGER</h2>
           </div>
           <button onClick={onClose} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10">
             <span className="material-symbols-outlined">close</span>
@@ -220,8 +220,8 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
               </div>
             ) : (
               filteredCredentials.map(cred => (
-                <div key={cred.id} className="bg-[var(--color-surface)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex items-center shadow-[2px_2px_0_0_rgba(0,0,0,0.5)]">
-                  <div className="w-1/3 flex items-center gap-2 font-[family-name:var(--font-headline-md)] text-[length:var(--text-headline-md)] uppercase">
+                <div key={cred.id} className="bg-[var(--color-surface)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex items-center shadow-[2px_2px_0_0_var(--color-on-surface)]">
+                  <div className="w-1/3 flex items-center gap-2 font-bold font-[family-name:var(--font-code-sm)] text-lg uppercase">
                     <span className="material-symbols-outlined text-[var(--color-primary)]">{getTypeIcon(cred.type)}</span>
                     {cred.type.replace('_', ' ')}
                   </div>
