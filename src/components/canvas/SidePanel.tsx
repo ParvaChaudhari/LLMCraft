@@ -114,6 +114,16 @@ export default function SidePanel({
   const [viewAsJson, setViewAsJson] = useState(false);
   const nodeEventSourceRef = useRef<EventSource | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   const toggleTab = (tabId: string) => {
     setActiveTabs(prev => {
       if (prev.includes(tabId)) {

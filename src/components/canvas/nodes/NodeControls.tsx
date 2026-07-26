@@ -25,41 +25,45 @@ export default function NodeControls({ id, data, showPin = false, label }: NodeC
 
   return (
     <>
-      {/* Delete Button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          deleteElements({ nodes: [{ id }] });
-        }}
-        className="absolute top-0 right-0 w-5 h-5 bg-red-600 text-white font-bold text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-red-500 border border-red-800 flex items-center justify-center pointer-events-auto"
-        title="Delete Node"
-      >
-        X
-      </button>
-
-      {/* Pin Button */}
-      {showPin && (
-        <button
-          onClick={togglePin}
-          className={`absolute top-0 right-6 w-5 h-5 text-xs rounded opacity-0 group-hover:opacity-100 transition-colors z-50 flex items-center justify-center pointer-events-auto border hover:bg-green-500 hover:text-black hover:border-green-600 ${data.isPinned ? 'bg-yellow-500 border-yellow-700 opacity-100 text-black' : 'bg-[#2d2d2d] border-[#1a1a1a] text-white'
+      <div className="absolute -top-5 right-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-auto z-50 translate-y-2 group-hover:translate-y-0">
+        {/* Pin Button */}
+        {showPin && (
+          <button
+            onClick={togglePin}
+            className={`w-5 h-5 flex items-center justify-center font-bold tactile-button transition-colors ${
+              data.isPinned 
+                ? 'bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] hover:bg-[#5ae658]' 
+                : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-variant)]'
             }`}
-          title={data.isPinned ? 'Unpin output' : 'Pin output'}
+            title={data.isPinned ? 'Unpin output' : 'Pin output'}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>{data.isPinned ? 'keep' : 'push_pin'}</span>
+          </button>
+        )}
+
+        {/* Delete Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            deleteElements({ nodes: [{ id }] });
+          }}
+          className="w-5 h-5 flex items-center justify-center bg-[var(--color-error)] text-[var(--color-on-error)] hover:bg-[#ff4444] font-bold tactile-button transition-colors"
+          title="Delete Node"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="17" x2="12" y2="22"></line>
-            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-          </svg>
+          <span className="material-symbols-outlined" style={{ fontSize: '12px' }}>delete</span>
         </button>
-      )}
+      </div>
 
       {/* Pin Badge */}
       {showPin && data.isPinned && (
-        <div className="absolute top-0 left-0 bg-yellow-500 text-black text-[8px] font-bold px-1 rounded-br z-50 pointer-events-none">PINNED</div>
+        <div className="absolute -top-2 -left-1 bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] text-[7px] font-bold px-1 py-[2px] font-[family-name:var(--font-code-sm)] border border-[var(--color-on-surface)] shadow-[1px_1px_0_0_var(--color-on-surface)] pointer-events-none z-50">
+          PINNED
+        </div>
       )}
 
       {/* Node Label Tooltip */}
       {label && (
-        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-black/70 text-white text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-20">
+        <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 bg-[var(--color-inverse-surface)] text-[var(--color-inverse-on-surface)] text-[9px] font-bold px-2 py-[2px] font-[family-name:var(--font-code-sm)] whitespace-nowrap pointer-events-none z-20 border border-[var(--color-on-surface)] opacity-0 group-hover:opacity-100 transition-opacity duration-200 shadow-[1px_1px_0_0_var(--color-on-surface)]">
           {label}
         </div>
       )}

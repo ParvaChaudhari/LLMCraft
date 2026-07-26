@@ -426,7 +426,6 @@ export default function CityCanvas() {
         >
           <IsometricBackground />
           {visualMode === 'roads' && <RoadLayer />}
-          <Controls />
         </ReactFlow>
       </div>
 
@@ -434,7 +433,7 @@ export default function CityCanvas() {
       <div className="absolute top-4 right-4 z-10 flex gap-4 items-center">
         {/* Hardware Slider Toggle */}
         <div 
-          className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-64 h-12 cursor-pointer"
+          className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-80 h-12 cursor-pointer"
           onClick={() => setVisualMode(visualMode === 'roads' ? 'pipes' : 'roads')}
         >
           {/* Sliding Block */}
@@ -444,14 +443,20 @@ export default function CityCanvas() {
             }`}
           />
           {/* Labels */}
-          <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] uppercase pointer-events-none select-none">
+          <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] pointer-events-none select-none">
             <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'roads' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
-              <span className="material-symbols-outlined text-[16px]">domain</span>
-              CITY
+              <span className="material-symbols-outlined text-[18px]">domain</span>
+              <div className="flex flex-col items-start leading-none justify-center">
+                <span>City</span>
+                <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Animation mode)</span>
+              </div>
             </div>
             <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'pipes' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
-              <span className="material-symbols-outlined text-[16px]">account_tree</span>
-              DATA
+              <span className="material-symbols-outlined text-[18px]">account_tree</span>
+              <div className="flex flex-col items-start leading-none justify-center">
+                <span>DataPipeline</span>
+                <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Fast Mode)</span>
+              </div>
             </div>
           </div>
         </div>

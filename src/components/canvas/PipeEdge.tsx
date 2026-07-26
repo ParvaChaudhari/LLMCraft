@@ -72,7 +72,7 @@ export default function PipeEdge({
       <g style={{ filter: 'drop-shadow(2px 8px 6px rgba(0,0,0,0.6))' }}>
 
         {/* Pipe 1 (Top-Left offset) */}
-        <g transform="translate(-4, -4)">
+        <g transform="translate(0, -6)">
           {/* Base pipe (dark) */}
           <path d={motionPath as string} fill="none" stroke={selected ? "#ffffff" : "#1f2937"} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
           {/* Cylindrical Highlight (shifted up for 3D effect) */}
@@ -82,7 +82,7 @@ export default function PipeEdge({
         </g>
 
         {/* Pipe 2 (Bottom-Right offset) */}
-        <g transform="translate(4, 4)">
+        <g transform="translate(0, 6)">
           <path d={motionPath as string} fill="none" stroke={selected ? "#ffffff" : "#1f2937"} strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />
           <g transform="translate(0, -2)">
             <path d={motionPath as string} fill="none" stroke="#6b7280" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -124,7 +124,7 @@ export default function PipeEdge({
             strokeLinejoin="round"
             strokeDasharray="8 24"
             className="animate-pipe-flow"
-            transform="translate(-4, -4)"
+            transform="translate(0, -6)"
           />
           <path
             d={motionPath as string}
@@ -135,7 +135,7 @@ export default function PipeEdge({
             strokeLinejoin="round"
             strokeDasharray="8 24"
             className="animate-pipe-flow"
-            transform="translate(4, 4)"
+            transform="translate(0, 6)"
             style={{ animationDelay: '-0.5s' }}
           />
         </g>

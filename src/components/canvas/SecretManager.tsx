@@ -41,6 +41,15 @@ export default function SecretManager({ onClose }: { onClose: () => void }) {
     fetchCredentials();
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this secret? This action cannot be undone.')) return;
     try {
