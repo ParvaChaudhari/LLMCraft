@@ -27,7 +27,7 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         setError('> ACCESS GRANTED. ROUTING...');
-        router.push('/');
+        router.push('/dashboard');
       }
     } catch (err: any) {
       setError(`> ERROR: ${err.message.toUpperCase()}`);
