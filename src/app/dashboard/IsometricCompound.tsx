@@ -6,7 +6,7 @@ interface IsometricCompoundProps {
     name?: string;
     graph_json?: { nodes?: any[] };
   };
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
 }
 
 /**
@@ -63,12 +63,16 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
     artStudio:       'art_studio.png',
     customWorkshop:  'custom_workshop.png',
     bankVault:       'bank-vault.png',
-    droneHub:        'drone_hub.png',
+    apify:           'drone_hub.png',
     sortingFacility: 'sorting_facility.png',
     printShop:       'print_shop.png',
     powerPlant:      'power_plant.png',
+    watchtower:      'watchtower.png',
+    output:          'output_dock.png',
+    delay:           'delay_stop.png',
+    webhook:         'webhook_tower.png',
     // Generic/utility nodes intentionally excluded:
-    //   webhook, conditional, output, delayStop, limitToll, watchtower
+    //   conditional, limitToll
   };
 
   // Get up to 6 unique "important" node types from the workflow
@@ -105,9 +109,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
 
   return (
     <div
-      onClick={onClick}
-      style={{ display: 'inline-block', cursor: 'pointer', userSelect: 'none', position: 'relative', padding: '8px' }}
-      className="iso-compound"
+      style={{ display: 'inline-block', userSelect: 'none', position: 'relative', padding: '8px', pointerEvents: 'none' }}
     >
       <svg
         width={svgW + 140}
@@ -115,6 +117,11 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         viewBox={`-130 -40 ${svgW + 140} ${svgH + 80}`}
         style={{ overflow: 'visible', display: 'block' }}
       >
+        <g 
+          className="iso-compound" 
+          onClick={onClick} 
+          style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+        >
         <defs>
           {/* Top face — dark synthetic green */}
           <linearGradient id={`top-grad-${workflow.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
@@ -172,7 +179,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         />
 
         {/* ── CORNER PILLARS & WIREFRAME ── */}
-        <g className="corner-pillars">
+        <g className="corner-pillars" style={{ pointerEvents: 'none' }}>
           {/* Transparent Lime Back Walls */}
           <polygon
             points={`${left.x},${left.y} ${top.x},${top.y} ${top.x},${top.y - 16} ${left.x},${left.y - 16}`}
@@ -291,6 +298,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
               </>
             );
           })()}
+        </g>
         </g>
       </svg>
 

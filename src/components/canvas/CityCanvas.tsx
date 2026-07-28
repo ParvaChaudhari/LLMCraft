@@ -399,11 +399,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
     }
   };
 
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-  };
+
 
   return (
     <div className="w-full h-full relative bg-[#4CAF50] flex">
@@ -443,8 +439,8 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
           className="h-12 px-4 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-variant)] tactile-button transition-colors font-bold font-[family-name:var(--font-code-sm)] text-sm gap-2"
           title="Return to World Dashboard"
         >
-          <span className="material-symbols-outlined text-[20px]">public</span>
-          ORBIT
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          DASHBOARD
         </button>
         {/* Hardware Slider Toggle */}
         <div 
@@ -503,13 +499,6 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
             ) : (
               <span className="material-symbols-outlined text-[24px]">play_arrow</span>
             )}
-          </button>
-          <button
-            onClick={handleLogout}
-            className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-error-container)] hover:text-[var(--color-on-error-container)] tactile-button transition-colors"
-            title="Logout"
-          >
-            <span className="material-symbols-outlined text-[24px]">logout</span>
           </button>
         </div>
       </div>

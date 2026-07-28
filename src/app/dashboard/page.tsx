@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import IsometricCompound from './IsometricCompound';
@@ -12,10 +12,73 @@ export default function DashboardPage() {
   const [showNewSectorModal, setShowNewSectorModal] = useState(false);
   const [newSectorName, setNewSectorName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
+
+  // Pan and Zoom state for custom canvas
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isCentering, setIsCentering] = useState(false);
+  const startMouse = useRef({ x: 0, y: 0 });
+  const startPan = useRef({ x: 0, y: 0 });
+
+  const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    // Don't drag if clicking on UI elements like buttons or modals
+    if ((e.target as HTMLElement).closest('button, input, .modal, .ui-panel, .iso-compound')) return;
+
+    setIsDragging(true);
+    setIsCentering(false);
+    startMouse.current = { x: e.clientX, y: e.clientY };
+    startPan.current = { x: pan.x, y: pan.y };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const dx = e.clientX - startMouse.current.x;
+    const dy = e.clientY - startMouse.current.y;
+    setPan({ x: startPan.current.x + dx, y: startPan.current.y + dy });
+  };
+
+  const handlePointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    // Zoom on ctrl+wheel (pinch) OR if standard mouse wheel (deltaY present, no deltaX)
+    const isMouseWheelZoom = Math.abs(e.deltaY) > 0 && e.deltaX === 0 && !e.ctrlKey && !e.metaKey;
+    
+    if (e.ctrlKey || e.metaKey || isMouseWheelZoom) {
+      if (e.ctrlKey || e.metaKey) e.preventDefault();
+      setIsCentering(false);
+      
+      const zoomFactor = -e.deltaY * (isMouseWheelZoom ? 0.002 : 0.01);
+      let newZoom = zoom * Math.exp(zoomFactor);
+      newZoom = Math.max(0.2, Math.min(newZoom, 3));
+      
+      // Zoom at cursor focal point instead of screen center
+      const cx = e.clientX - window.innerWidth / 2;
+      const cy = e.clientY - window.innerHeight / 2;
+      
+      const wx = (cx - pan.x) / zoom;
+      const wy = (cy - pan.y) / zoom;
+      
+      setPan({
+        x: cx - wx * newZoom,
+        y: cy - wy * newZoom
+      });
+      setZoom(newZoom);
+    } else {
+      setIsCentering(false);
+      setPan((p) => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }));
+    }
+  };
 
   const router = useRouter();
   const supabase = createClient();
@@ -24,7 +87,7 @@ export default function DashboardPage() {
     e.preventDefault();
     if (!newSectorName.trim() || isCreating) return;
     setIsCreating(true);
-    
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -32,10 +95,10 @@ export default function DashboardPage() {
     const { data, error } = await supabase
       .from('workflows')
       .insert([
-        { 
-          user_id: user.id, 
-          name: newSectorName, 
-          graph_json: initialGraph 
+        {
+          user_id: user.id,
+          name: newSectorName,
+          graph_json: initialGraph
         }
       ])
       .select()
@@ -52,12 +115,12 @@ export default function DashboardPage() {
   const handleRenameCity = async () => {
     if (!selectedWorkflow || !editingNameValue.trim() || isSavingName) return;
     setIsSavingName(true);
-    
+
     const { error } = await supabase
       .from('workflows')
       .update({ name: editingNameValue })
       .eq('id', selectedWorkflow.id);
-      
+
     if (!error) {
       setWorkflows(workflows.map(w => w.id === selectedWorkflow.id ? { ...w, name: editingNameValue } : w));
       setSelectedWorkflow({ ...selectedWorkflow, name: editingNameValue });
@@ -71,7 +134,7 @@ export default function DashboardPage() {
   const handleDeleteSector = async () => {
     if (!selectedWorkflow) return;
     if (!confirm(`Are you sure you want to delete "${selectedWorkflow.name || 'Unnamed City'}"?`)) return;
-    
+
     await supabase.from('workflows').delete().eq('id', selectedWorkflow.id);
     setWorkflows(workflows.filter(w => w.id !== selectedWorkflow.id));
     setSelectedWorkflow(null);
@@ -91,7 +154,30 @@ export default function DashboardPage() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-      if (data) setWorkflows(data);
+      if (data) {
+        const positions = new Set();
+        // Dynamically scale cluster size based on number of cities to keep them tight
+        const clusterSize = Math.max(3, Math.ceil(Math.sqrt(data.length)));
+        const halfSize = Math.floor(clusterSize / 2);
+
+        const scatteredData = data.map((wf, idx) => {
+          let r = 0, c = 0;
+          if (wf.id) {
+            let seed = wf.id.charCodeAt(0) + wf.id.charCodeAt(wf.id.length - 1) + idx;
+            let attempts = 0;
+            while (positions.has(`${r},${c}`) && attempts < 1000) {
+              r = (seed % clusterSize) - halfSize;
+              c = (Math.floor(seed / clusterSize) % clusterSize) - halfSize;
+              seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+              attempts++;
+            }
+            if (attempts >= 1000) { r = idx; c = idx; }
+          }
+          positions.add(`${r},${c}`);
+          return { ...wf, gridR: r, gridC: c };
+        });
+        setWorkflows(scatteredData);
+      }
       setLoading(false);
     }
     load();
@@ -151,12 +237,12 @@ export default function DashboardPage() {
             boxShadow: '2px 2px 0 #1d1b1a',
             transition: 'all 0.1s',
           }}
-          onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
-          onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+            onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
+            onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
           >
             + INITIALIZE NEW CITY
           </button>
-          
+
           <button
             onClick={handleLogout}
             title="Logout"
@@ -205,7 +291,7 @@ export default function DashboardPage() {
                 <div>
                   {isEditingName ? (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input 
+                      <input
                         autoFocus
                         value={editingNameValue}
                         onChange={e => setEditingNameValue(e.target.value)}
@@ -242,7 +328,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setSelectedWorkflow(null)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#665e4b' }}
               >
@@ -252,7 +338,7 @@ export default function DashboardPage() {
 
             {/* Actions */}
             <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button 
+              <button
                 onClick={() => router.push(`/city/${selectedWorkflow.id}`)}
                 style={{
                   background: '#23ff47', color: '#002203', border: '2px solid #1d1b1a',
@@ -264,11 +350,11 @@ export default function DashboardPage() {
                 onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '3px 3px 0 #1d1b1a')}
               >
                 <span className="material-symbols-outlined">login</span>
-                ENTER EDITOR
+                ENTER CITY
               </button>
-              
+
               <div style={{ display: 'flex', gap: 12 }}>
-                <button 
+                <button
                   onClick={handleDeleteSector}
                   style={{
                     flex: 1, background: '#e4e2e1', color: '#ba1a1a', border: '2px solid #1d1b1a', padding: '10px',
@@ -283,8 +369,8 @@ export default function DashboardPage() {
                   flex: 1, background: '#1d1b1a', color: '#00e639', border: '2px solid #1d1b1a', padding: '10px',
                   fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
                 }}
-                onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
-                onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+                  onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
+                  onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
                 >
                   START
                 </button>
@@ -321,50 +407,94 @@ export default function DashboardPage() {
           overflow: 'hidden',
         }}>
 
-          {/* Deep digital ocean blue background */}
-          <div style={{ position: 'absolute', inset: 0, background: '#64b5f6' }} />
+          {/* Deep digital ocean blue background with animated geometric wave grid */}
+          <div style={{ position: 'absolute', inset: 0, background: '#64b5f6', overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', inset: '-100%',
+              backgroundSize: '60px 60px',
+              backgroundImage: 'linear-gradient(to right, rgba(255,255,255,0.15) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.15) 1px, transparent 1px)',
+              transformOrigin: 'center center',
+              animation: 'oceanGridMove 4s linear infinite',
+            }} />
+          </div>
+          <style>{`
+            @keyframes oceanGridMove {
+              0% { transform: rotateX(60deg) rotateZ(45deg) translateY(0); }
+              100% { transform: rotateX(60deg) rotateZ(45deg) translateY(60px); }
+            }
+          `}</style>
 
-          {/* Scrollable world area */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            overflowX: 'auto', overflowY: 'auto',
-            display: 'flex',
-            flexWrap: 'wrap',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 0,
-            padding: '80px 60px',
-          }}>
-            {loading ? (
-              <div style={{ fontFamily: 'JetBrains Mono', fontSize: 12, color: '#006e16', fontWeight: 700, letterSpacing: '0.1em', animation: 'pulse 1.5s infinite' }}>
-                LOADING WORLD DATA...
-              </div>
-            ) : workflows.length === 0 ? (
-              <div style={{ textAlign: 'center', fontFamily: 'JetBrains Mono', fontSize: 12, color: '#4b463e' }}>
-                <div style={{ marginBottom: 16, opacity: 0.6 }}>NO CITIES ONLINE</div>
-                <button onClick={() => router.push('/')} style={{
-                  background: '#23ff47', color: '#002203',
-                  border: '2px solid #1d1b1a', padding: '10px 24px',
-                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
-                  cursor: 'pointer', boxShadow: '3px 3px 0 #1d1b1a',
-                  letterSpacing: '0.08em',
-                }}>
-                  INITIALIZE NEW CITY
-                </button>
-              </div>
-            ) : (
-              workflows.map(wf => (
-                <IsometricCompound
-                  key={wf.id}
-                  workflow={wf}
-                  onClick={() => {
-                    setSelectedWorkflow(wf);
-                    setIsEditingName(false);
-                    setEditingNameValue(wf.name || '');
-                  }}
-                />
-              ))
-            )}
+          {/* Draggable world area */}
+          <div
+            style={{
+              position: 'absolute', inset: 0,
+              overflow: 'hidden',
+              cursor: isDragging ? 'grabbing' : 'grab',
+              touchAction: 'none', // Prevent browser default pan on touch
+            }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerLeave={handlePointerUp}
+            onWheel={handleWheel}
+          >
+            {/* Camera Transform Container */}
+            <div style={{
+              position: 'absolute',
+              left: '50%', top: '50%',
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transition: isDragging || !isCentering ? 'none' : 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}>
+              {loading ? (
+                <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', fontFamily: 'JetBrains Mono', fontSize: 12, color: '#006e16', fontWeight: 700, letterSpacing: '0.1em', animation: 'pulse 1.5s infinite', whiteSpace: 'nowrap' }}>
+                  LOADING WORLD DATA...
+                </div>
+              ) : workflows.length === 0 ? (
+                <div style={{ position: 'absolute', transform: 'translate(-50%, -50%)', textAlign: 'center', fontFamily: 'JetBrains Mono', fontSize: 12, color: '#4b463e', whiteSpace: 'nowrap' }}>
+                  <div style={{ marginBottom: 16, opacity: 0.6 }}>NO CITIES ONLINE</div>
+                  <button onClick={() => router.push('/')} style={{
+                    background: '#23ff47', color: '#002203',
+                    border: '2px solid #1d1b1a', padding: '10px 24px',
+                    fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                    cursor: 'pointer', boxShadow: '3px 3px 0 #1d1b1a',
+                    letterSpacing: '0.08em',
+                  }}>
+                    INITIALIZE NEW CITY
+                  </button>
+                </div>
+              ) : (
+                workflows.map((wf, index) => {
+                  const col = wf.gridC !== undefined ? wf.gridC : index % 3;
+                  const row = wf.gridR !== undefined ? wf.gridR : Math.floor(index / 3);
+                  // True Isometric placement (400x200 leaves a comfortable water gap between platforms)
+                  const isoX = (col - row) * 450;
+                  const isoY = (col + row) * 300;
+
+                  return (
+                    <div key={wf.id} style={{
+                      position: 'absolute',
+                      left: isoX,
+                      top: isoY,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: Math.round(isoY),
+                    }}>
+                      <IsometricCompound
+                        workflow={wf}
+                        onClick={() => {
+                          setSelectedWorkflow(wf);
+                          setIsEditingName(false);
+                          setEditingNameValue(wf.name || '');
+
+                          // Smooth pan camera to center this city
+                          setIsCentering(true);
+                          setPan({ x: -isoX * zoom, y: -isoY * zoom });
+                        }}
+                      />
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
 
           {/* Viewport navigation arrows removed */}
@@ -430,7 +560,7 @@ export default function DashboardPage() {
             </div>
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <label style={{ fontSize: 11, fontWeight: 700, color: '#4b463e', letterSpacing: '0.08em' }}>CITY NAME:</label>
-              <input 
+              <input
                 autoFocus
                 type="text"
                 value={newSectorName}
