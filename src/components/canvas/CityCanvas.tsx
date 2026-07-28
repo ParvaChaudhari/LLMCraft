@@ -78,7 +78,7 @@ const defaultInitialNodes: Node[] = [];
 let id = 0;
 const getId = () => `node_${id++}_${Date.now()}`;
 
-export default function CityCanvas() {
+export default function CityCanvas({ cityId }: { cityId?: string }) {
   const [nodes, setNodes] = useState<Node[]>(defaultInitialNodes);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -105,13 +105,18 @@ export default function CityCanvas() {
         return;
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('workflows')
         .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+        .eq('user_id', user.id);
+        
+      if (cityId) {
+        query = query.eq('id', cityId).single();
+      } else {
+        query = query.order('created_at', { ascending: false }).limit(1).single();
+      }
+
+      const { data, error } = await query;
 
       if (data && data.graph_json) {
         setNodes(data.graph_json.nodes || []);
@@ -120,7 +125,7 @@ export default function CityCanvas() {
       }
     }
     loadWorkflow();
-  }, [router, supabase]);
+  }, [router, supabase, cityId]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -132,15 +137,17 @@ export default function CityCanvas() {
       return;
     }
 
-    const payload = {
-      user_id: user.id,
-      name: "My First City",
-      graph_json: { nodes, edges }
-    };
-
     if (workflowId) {
+      // Just update the graph, leave the name alone
+      const payload = { graph_json: { nodes, edges } };
       await supabase.from('workflows').update(payload).eq('id', workflowId);
     } else {
+      // Fallback for brand new graphs not created via dashboard
+      const payload = {
+        user_id: user.id,
+        name: "My First City",
+        graph_json: { nodes, edges }
+      };
       const { data, error } = await supabase.from('workflows').insert([payload]).select().single();
       if (data) setWorkflowId(data.id);
       if (error) console.error("Save error:", error);

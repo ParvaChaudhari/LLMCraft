@@ -8,8 +8,79 @@ import IsometricCompound from './IsometricCompound';
 export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedWorkflow, setSelectedWorkflow] = useState<any | null>(null);
+  const [showNewSectorModal, setShowNewSectorModal] = useState(false);
+  const [newSectorName, setNewSectorName] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
+
   const router = useRouter();
   const supabase = createClient();
+
+  const handleCreateSector = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSectorName.trim() || isCreating) return;
+    setIsCreating(true);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const initialGraph = { nodes: [], edges: [] };
+    const { data, error } = await supabase
+      .from('workflows')
+      .insert([
+        { 
+          user_id: user.id, 
+          name: newSectorName, 
+          graph_json: initialGraph 
+        }
+      ])
+      .select()
+      .single();
+
+    if (data) {
+      router.push(`/city/${data.id}`);
+    } else {
+      console.error(error);
+      setIsCreating(false);
+    }
+  };
+
+  const handleRenameCity = async () => {
+    if (!selectedWorkflow || !editingNameValue.trim() || isSavingName) return;
+    setIsSavingName(true);
+    
+    const { error } = await supabase
+      .from('workflows')
+      .update({ name: editingNameValue })
+      .eq('id', selectedWorkflow.id);
+      
+    if (!error) {
+      setWorkflows(workflows.map(w => w.id === selectedWorkflow.id ? { ...w, name: editingNameValue } : w));
+      setSelectedWorkflow({ ...selectedWorkflow, name: editingNameValue });
+      setIsEditingName(false);
+    } else {
+      console.error(error);
+    }
+    setIsSavingName(false);
+  };
+
+  const handleDeleteSector = async () => {
+    if (!selectedWorkflow) return;
+    if (!confirm(`Are you sure you want to delete "${selectedWorkflow.name || 'Unnamed City'}"?`)) return;
+    
+    await supabase.from('workflows').delete().eq('id', selectedWorkflow.id);
+    setWorkflows(workflows.filter(w => w.id !== selectedWorkflow.id));
+    setSelectedWorkflow(null);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   useEffect(() => {
     async function load() {
@@ -51,8 +122,9 @@ export default function DashboardPage() {
         boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
         zIndex: 50,
       }}>
-        {/* Left: Logo + Tabs */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+        {/* Left: Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="material-symbols-outlined" style={{ color: '#00e639', fontSize: 24 }}>public</span>
           <span style={{
             fontFamily: 'Space Grotesk, sans-serif',
             fontSize: 20,
@@ -60,39 +132,13 @@ export default function DashboardPage() {
             color: '#d1c5ae',
             letterSpacing: '-0.02em',
           }}>
-            LLMCRAFT: STATION_01
+            LLMCRAFT: DASHBOARD
           </span>
-          <nav style={{ display: 'flex', gap: 4 }}>
-            {['SYSTEM', 'AGENTS', 'INFRA', 'MAP'].map((tab, i) => (
-              <button key={tab} style={{
-                background: 'transparent',
-                border: 'none',
-                padding: '4px 10px',
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.08em',
-                cursor: 'pointer',
-                color: i === 0 ? '#23ff47' : '#c8c6c6',
-                borderBottom: i === 0 ? '2px solid #23ff47' : '2px solid transparent',
-              }}>
-                {tab}
-              </button>
-            ))}
-          </nav>
         </div>
 
-        {/* Right: Icons + Deploy */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {['settings', 'terminal', 'notifications'].map(icon => (
-            <button key={icon} style={{
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              padding: 8, color: '#00e639',
-              fontFamily: 'Material Symbols Outlined',
-              fontSize: 20,
-            }} className="material-symbols-outlined">{icon}</button>
-          ))}
-          <button style={{
+        {/* Right: New Sector + Logout */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => setShowNewSectorModal(true)} style={{
             background: '#23ff47',
             color: '#002203',
             border: '2px solid #1d1b1a',
@@ -108,98 +154,164 @@ export default function DashboardPage() {
           onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
           onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
           >
-            DEPLOY
+            + INITIALIZE NEW CITY
+          </button>
+          
+          <button
+            onClick={handleLogout}
+            title="Logout"
+            style={{
+              width: 40, height: 40,
+              background: '#e4e2e1', border: '2px solid #1d1b1a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
+              color: '#1d1b1a',
+            }}
+            onMouseOver={e => { e.currentTarget.style.background = '#ffb4ab'; }}
+            onMouseOut={e => { e.currentTarget.style.background = '#e4e2e1'; }}
+            onMouseDown={e => { e.currentTarget.style.transform = 'translate(2px,2px)'; e.currentTarget.style.boxShadow = 'none'; }}
+            onMouseUp={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a'; }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
           </button>
         </div>
       </header>
 
       {/* ══════════════ BODY ══════════════ */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
         {/* ── LEFT SIDEBAR ── */}
-        <aside style={{
-          width: 240,
-          flexShrink: 0,
-          background: '#f2edea',
-          borderRight: '2px solid #1d1b1a',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 40,
-        }}>
-          {/* Station Core Header */}
-          <div style={{ padding: '16px', borderBottom: '2px solid #cdc6ba' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{
-                width: 36, height: 36,
-                background: '#e8dcc4',
-                border: '2px solid #1d1b1a',
-                boxShadow: '2px 2px 0 #1d1b1a',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#665e4b' }}>terminal</span>
+        {selectedWorkflow && (
+          <aside style={{
+            position: 'absolute',
+            top: 0, bottom: 0, left: 0,
+            width: 320,
+            background: '#f2edea',
+            borderRight: '2px solid #1d1b1a',
+            display: 'flex',
+            flexDirection: 'column',
+            zIndex: 40,
+          }}>
+            {/* City Header */}
+            <div style={{ padding: '20px 16px', borderBottom: '2px solid #cdc6ba', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 48, height: 48,
+                  background: '#e8dcc4', border: '2px solid #1d1b1a', boxShadow: '2px 2px 0 #1d1b1a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#665e4b' }}>location_city</span>
+                </div>
+                <div>
+                  {isEditingName ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <input 
+                        autoFocus
+                        value={editingNameValue}
+                        onChange={e => setEditingNameValue(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleRenameCity();
+                          if (e.key === 'Escape') setIsEditingName(false);
+                        }}
+                        style={{
+                          background: '#fff', border: '2px solid #1d1b1a', padding: '2px 6px',
+                          fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700,
+                          color: '#1d1b1a', width: 140, outline: 'none'
+                        }}
+                      />
+                      <button onClick={handleRenameCity} disabled={isSavingName} style={{
+                        background: '#23ff47', border: '2px solid #1d1b1a', padding: '2px 6px',
+                        cursor: 'pointer', fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 10
+                      }}>SAVE</button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', color: '#1d1b1a', textTransform: 'uppercase' }}>
+                        {selectedWorkflow.name || 'Unnamed City'}
+                      </div>
+                      <button onClick={() => { setIsEditingName(true); setEditingNameValue(selectedWorkflow.name || ''); }} style={{
+                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                        display: 'flex', alignItems: 'center', color: '#665e4b'
+                      }} title="Rename City">
+                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#006e16', letterSpacing: '0.08em', marginTop: 4 }}>
+                    STATUS: OFFLINE
+                  </div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: '#1d1b1a' }}>STATION_CORE</div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#006e16', letterSpacing: '0.08em' }}>STATUS: OPTIMAL</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Nav Items */}
-          <nav style={{ flex: 1, padding: '8px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {[
-              { icon: 'apartment', label: 'CONSTRUCT', active: true },
-              { icon: 'reorder', label: 'LOGISTICS' },
-              { icon: 'bolt', label: 'ENERGY' },
-              { icon: 'biotech', label: 'RESEARCH' },
-              { icon: 'terminal', label: 'COMMAND' },
-            ].map(item => (
-              <button key={item.label} style={{
-                background: item.active ? '#e8dcc4' : 'transparent',
-                border: item.active ? '2px solid #1d1b1a' : '2px solid transparent',
-                boxShadow: item.active ? '2px 2px 0 #1d1b1a' : 'none',
-                padding: '10px 12px',
-                display: 'flex', alignItems: 'center', gap: 10,
-                fontFamily: 'JetBrains Mono, monospace',
-                fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-                color: item.active ? '#1d1b1a' : '#4b463e',
-                cursor: 'pointer',
-                textAlign: 'left',
-                transition: 'all 0.1s',
-              }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>{item.icon}</span>
-                {item.label}
+              <button 
+                onClick={() => setSelectedWorkflow(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#665e4b' }}
+              >
+                <span className="material-symbols-outlined">close</span>
               </button>
-            ))}
-          </nav>
-
-          {/* Bottom Actions */}
-          <div style={{ padding: '16px', borderTop: '2px solid #cdc6ba', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button style={{
-              background: '#e4e2e1',
-              border: '2px solid #1d1b1a',
-              padding: '10px',
-              fontFamily: 'JetBrains Mono, monospace',
-              fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
-              cursor: 'pointer',
-              boxShadow: '2px 2px 0 #1d1b1a',
-              transition: 'all 0.1s',
-            }}
-            onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
-            onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
-            >
-              SYNC_NODES
-            </button>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#4b463e', textDecoration: 'none' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>code</span> TERMINAL
-              </a>
-              <a href="#" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: '#4b463e', textDecoration: 'none' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>help_outline</span> HELP
-              </a>
             </div>
-          </div>
-        </aside>
+
+            {/* Actions */}
+            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <button 
+                onClick={() => router.push(`/city/${selectedWorkflow.id}`)}
+                style={{
+                  background: '#23ff47', color: '#002203', border: '2px solid #1d1b1a',
+                  padding: '12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', boxShadow: '3px 3px 0 #1d1b1a',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'translate(3px,3px)', e.currentTarget.style.boxShadow = 'none')}
+                onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '3px 3px 0 #1d1b1a')}
+              >
+                <span className="material-symbols-outlined">login</span>
+                ENTER EDITOR
+              </button>
+              
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button 
+                  onClick={handleDeleteSector}
+                  style={{
+                    flex: 1, background: '#e4e2e1', color: '#ba1a1a', border: '2px solid #1d1b1a', padding: '10px',
+                    fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
+                  }}
+                  onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
+                  onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+                >
+                  DELETE
+                </button>
+                <button style={{
+                  flex: 1, background: '#1d1b1a', color: '#00e639', border: '2px solid #1d1b1a', padding: '10px',
+                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
+                }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
+                onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+                >
+                  START
+                </button>
+              </div>
+            </div>
+
+            {/* Logs Window */}
+            <div style={{
+              flex: 1, margin: '16px', background: '#32302e', border: '2px solid #1d1b1a',
+              boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column',
+              overflow: 'hidden',
+            }}>
+              <div style={{ padding: '6px 10px', borderBottom: '2px solid #1d1b1a', fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.08em' }}>
+                CITY_LOGS.EXE
+              </div>
+              <div style={{
+                flex: 1, padding: '10px', overflowY: 'auto',
+                fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: '1.6',
+                color: '#c8c6c6', display: 'flex', flexDirection: 'column', gap: 6,
+              }}>
+                <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
+                <div>&gt; Found {selectedWorkflow.graph_json?.nodes?.length || 0} structures.</div>
+                <div>&gt; Awaiting deployment sequence...</div>
+              </div>
+            </div>
+          </aside>
+        )}
 
         {/* ── MAIN CANVAS ── */}
         <main style={{
@@ -209,8 +321,8 @@ export default function DashboardPage() {
           overflow: 'hidden',
         }}>
 
-          {/* Soft dark green background */}
-          <div style={{ position: 'absolute', inset: 0, background: '#9cb3a2' }} />
+          {/* Deep digital ocean blue background */}
+          <div style={{ position: 'absolute', inset: 0, background: '#64b5f6' }} />
 
           {/* Scrollable world area */}
           <div style={{
@@ -229,7 +341,7 @@ export default function DashboardPage() {
               </div>
             ) : workflows.length === 0 ? (
               <div style={{ textAlign: 'center', fontFamily: 'JetBrains Mono', fontSize: 12, color: '#4b463e' }}>
-                <div style={{ marginBottom: 16, opacity: 0.6 }}>NO SECTORS ONLINE</div>
+                <div style={{ marginBottom: 16, opacity: 0.6 }}>NO CITIES ONLINE</div>
                 <button onClick={() => router.push('/')} style={{
                   background: '#23ff47', color: '#002203',
                   border: '2px solid #1d1b1a', padding: '10px 24px',
@@ -237,7 +349,7 @@ export default function DashboardPage() {
                   cursor: 'pointer', boxShadow: '3px 3px 0 #1d1b1a',
                   letterSpacing: '0.08em',
                 }}>
-                  INITIALIZE NEW SECTOR
+                  INITIALIZE NEW CITY
                 </button>
               </div>
             ) : (
@@ -245,161 +357,19 @@ export default function DashboardPage() {
                 <IsometricCompound
                   key={wf.id}
                   workflow={wf}
-                  onClick={() => router.push('/')}
+                  onClick={() => {
+                    setSelectedWorkflow(wf);
+                    setIsEditingName(false);
+                    setEditingNameValue(wf.name || '');
+                  }}
                 />
               ))
             )}
           </div>
 
-          {/* ── Viewport navigation arrows ── */}
-          <button style={{
-            position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
-            width: 40, height: 40,
-            background: '#f2edea', border: '2px solid #1d1b1a',
-            boxShadow: '3px 3px 0 rgba(0,0,0,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 20,
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_back</span>
-          </button>
-          <button style={{
-            position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-            width: 40, height: 40,
-            background: '#f2edea', border: '2px solid #1d1b1a',
-            boxShadow: '3px 3px 0 rgba(0,0,0,0.2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', zIndex: 20,
-          }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>arrow_forward</span>
-          </button>
+          {/* Viewport navigation arrows removed */}
 
-          {/* ── BOTTOM LEFT: Terminal ── */}
-          <div style={{
-            position: 'absolute', bottom: 16, left: 16,
-            width: 320, height: 192,
-            background: '#4b463e',
-            border: '2px solid #1d1b1a',
-            boxShadow: '4px 4px 0 rgba(0,0,0,0.3)',
-            display: 'flex', flexDirection: 'column',
-            zIndex: 30,
-            overflow: 'hidden',
-          }}>
-            <div style={{
-              background: '#32302e',
-              padding: '4px 10px',
-              borderBottom: '2px solid #1d1b1a',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            }}>
-              <span style={{ fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.08em' }}>GLOBAL_INBOX.LOG</span>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#00e639' }} />
-            </div>
-            <div style={{
-              flex: 1, padding: '8px', overflowY: 'auto',
-              fontFamily: 'JetBrains Mono', fontSize: 11,
-              lineHeight: '16px',
-              background: '#2a2826',
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              {[
-                { time: '10:45 AM', msg: 'PROJECT B-2: Agent Z completed task.', color: '#00e639' },
-                { time: '10:30 AM', msg: 'PROJECT C-3: Deployment successful.', color: '#00e639' },
-                { time: '10:15 AM', msg: 'AI_MODEL_TRAINER: Critical memory leak detected.', color: '#ba1a1a' },
-                { time: '10:00 AM', msg: 'SYSTEM: Daily node sync initiated.', color: 'white' },
-                { time: '09:55 AM', msg: 'INFRA: Sector 7 power stable.', color: '#00e639' },
-              ].map((line, i) => (
-                <div key={i} style={{ color: line.color }}>
-                  <span style={{ opacity: 0.5 }}>[{line.time}]</span> {line.msg}
-                </div>
-              ))}
-              <div style={{ color: '#00e639', opacity: 0.8 }}>_</div>
-            </div>
-          </div>
-
-          {/* ── BOTTOM RIGHT: Radar + Toggles ── */}
-          <div style={{
-            position: 'absolute', bottom: 16, right: 16,
-            display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
-            zIndex: 30,
-          }}>
-            {/* Radar */}
-            <div style={{
-              width: 192, height: 192,
-              background: '#1d1b1a',
-              border: '2px solid #1d1b1a',
-              boxShadow: '4px 4px 0 rgba(0,0,0,0.3)',
-              position: 'relative', overflow: 'hidden',
-            }}>
-              <div style={{
-                position: 'absolute', top: 0, left: 0,
-                background: '#32302e', padding: '2px 8px',
-                fontSize: 9, fontWeight: 700, color: 'white', letterSpacing: '0.08em',
-                borderRight: '1px solid #1d1b1a', borderBottom: '1px solid #1d1b1a',
-                zIndex: 5,
-              }}>RADAR_NAV_0.8</div>
-
-              {/* Grid lines */}
-              <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: 1, background: 'rgba(0,230,57,0.15)' }} />
-              <div style={{ position: 'absolute', left: '50%', top: 0, bottom: 0, width: 1, background: 'rgba(0,230,57,0.15)' }} />
-
-              {/* Radar sweep */}
-              <div style={{
-                position: 'absolute', top: '50%', left: '50%',
-                width: '200%', height: 1,
-                background: 'rgba(0,230,57,0.3)',
-                transformOrigin: 'left center',
-                animation: 'radar-sweep 4s linear infinite',
-              }} />
-
-              {/* Blips */}
-              {workflows.map((wf, i) => (
-                <div key={wf.id} style={{
-                  position: 'absolute',
-                  width: 8, height: 8,
-                  background: '#006e16',
-                  boxShadow: '0 0 5px #00ff41',
-                  left: `${20 + (i * 30) % 55}%`,
-                  top: `${30 + (i * 20) % 40}%`,
-                }} />
-              ))}
-
-              <button style={{
-                position: 'absolute', bottom: 4, right: 4,
-                background: '#f2edea', border: '1px solid #1d1b1a',
-                fontSize: 9, fontWeight: 700, color: '#1d1b1a',
-                padding: '2px 4px', cursor: 'pointer', letterSpacing: '0.06em',
-              }}>ZOOM_TO_FIT</button>
-            </div>
-
-            {/* HUD Toggles */}
-            <div style={{
-              background: '#f2edea',
-              border: '2px solid #1d1b1a',
-              boxShadow: '4px 4px 0 rgba(0,0,0,0.2)',
-              padding: '8px 12px',
-              display: 'flex', gap: 16, alignItems: 'center',
-            }}>
-              {[{ label: 'OPS MODE', on: true }, { label: 'LABELS', on: true }, { label: 'FOCUS', on: false }].map(toggle => (
-                <div key={toggle.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: '#4b463e', letterSpacing: '0.06em' }}>{toggle.label}</span>
-                  <div style={{
-                    width: 36, height: 18,
-                    background: toggle.on ? '#006e16' : '#cdc6ba',
-                    border: '1px solid #1d1b1a',
-                    position: 'relative', cursor: 'pointer',
-                  }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: 2,
-                      [toggle.on ? 'right' : 'left']: 2,
-                      width: 14, height: 14,
-                      background: 'white',
-                      border: '1px solid #1d1b1a',
-                    }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Note: HUD Elements removed */}
         </main>
       </div>
 
@@ -438,6 +408,58 @@ export default function DashboardPage() {
           50% { opacity: 0.4; }
         }
       `}</style>
+
+      {/* New Sector Modal */}
+      {showNewSectorModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgba(29, 27, 26, 0.8)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
+        }}>
+          <form onSubmit={handleCreateSector} style={{
+            background: '#e4e2e1', width: 400, border: '2px solid #1d1b1a',
+            boxShadow: '8px 8px 0 rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column',
+          }}>
+            <div style={{
+              background: '#32302e', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              borderBottom: '2px solid #1d1b1a'
+            }}>
+              <span style={{ color: '#00e639', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>INITIALIZE_NEW_CITY.EXE</span>
+              <button type="button" onClick={() => setShowNewSectorModal(false)} style={{ background: 'none', border: 'none', color: '#c8c6c6', cursor: 'pointer' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
+              </button>
+            </div>
+            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#4b463e', letterSpacing: '0.08em' }}>CITY NAME:</label>
+              <input 
+                autoFocus
+                type="text"
+                value={newSectorName}
+                onChange={e => setNewSectorName(e.target.value)}
+                placeholder="e.g. Neo Tokyo"
+                style={{
+                  background: '#f8f3ef', border: '2px solid #1d1b1a', padding: 12,
+                  fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: '#1d1b1a',
+                  outline: 'none', boxShadow: 'inset 2px 2px 0 rgba(0,0,0,0.1)'
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
+                <button type="button" onClick={() => setShowNewSectorModal(false)} style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, color: '#4b463e'
+                }}>CANCEL</button>
+                <button type="submit" disabled={!newSectorName.trim() || isCreating} style={{
+                  background: '#23ff47', color: '#002203', border: '2px solid #1d1b1a',
+                  padding: '10px 24px', fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
+                  cursor: isCreating || !newSectorName.trim() ? 'not-allowed' : 'pointer',
+                  boxShadow: '2px 2px 0 #1d1b1a', opacity: isCreating || !newSectorName.trim() ? 0.5 : 1
+                }}>
+                  {isCreating ? 'INITIALIZING...' : 'INITIALIZE'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

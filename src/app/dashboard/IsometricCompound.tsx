@@ -111,15 +111,15 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
     >
       <svg
         width={svgW + 140}
-        height={svgH + 48}
-        viewBox={`-130 -8 ${svgW + 140} ${svgH + 48}`}
+        height={svgH + 80}
+        viewBox={`-130 -40 ${svgW + 140} ${svgH + 80}`}
         style={{ overflow: 'visible', display: 'block' }}
       >
         <defs>
-          {/* Top face — light grass green */}
+          {/* Top face — dark synthetic green */}
           <linearGradient id={`top-grad-${workflow.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#8cba6b" />
-            <stop offset="100%" stopColor="#8cba6b" />
+            <stop offset="0%" stopColor="#009920" />
+            <stop offset="100%" stopColor="#007718" />
           </linearGradient>
 
           {/* Top face subtle grid pattern */}
@@ -140,8 +140,8 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         {/* ── RIGHT WALL (darkest — in shadow) ── */}
         <polygon
           points={rightWall}
-          fill="#4e7332"
-          stroke="#1d1b1a"
+          fill="#00330a"
+          stroke="#00330a"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -149,8 +149,8 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         {/* ── LEFT WALL (mid-tone — partial light) ── */}
         <polygon
           points={leftWall}
-          fill="#6a944a"
-          stroke="#1d1b1a"
+          fill="#005511"
+          stroke="#005511"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -159,7 +159,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         <polygon
           points={topFace}
           fill={`url(#top-grad-${workflow.id})`}
-          stroke="#1d1b1a"
+          stroke="#009920"
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -170,6 +170,35 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
           fill={`url(#gloss-${workflow.id})`}
           style={{ pointerEvents: 'none' }}
         />
+
+        {/* ── CORNER PILLARS & WIREFRAME ── */}
+        <g className="corner-pillars">
+          {/* Transparent Lime Back Walls */}
+          <polygon
+            points={`${left.x},${left.y} ${top.x},${top.y} ${top.x},${top.y - 16} ${left.x},${left.y - 16}`}
+            fill="rgba(35, 255, 71, 0.4)"
+          />
+          <polygon
+            points={`${top.x},${top.y} ${right.x},${right.y} ${right.x},${right.y - 16} ${top.x},${top.y - 16}`}
+            fill="rgba(35, 255, 71, 0.25)"
+          />
+
+          {/* Vertical poles */}
+          <g stroke="#66ff00" strokeWidth="2" strokeLinecap="round">
+            <line x1={top.x} y1={top.y} x2={top.x} y2={top.y - 16} />
+            <line x1={right.x} y1={right.y} x2={right.x} y2={right.y - 16} />
+            <line x1={bottom.x} y1={bottom.y} x2={bottom.x} y2={bottom.y - 16} />
+            <line x1={left.x} y1={left.y} x2={left.x} y2={left.y - 16} />
+          </g>
+          {/* Connecting top wireframe */}
+          <polygon
+            points={`${top.x},${top.y - 16} ${right.x},${right.y - 16} ${bottom.x},${bottom.y - 16} ${left.x},${left.y - 16}`}
+            fill="none"
+            stroke="#66ff00"
+            strokeWidth="1"
+            strokeLinejoin="round"
+          />
+        </g>
 
         {/* ── BUILDING SPRITES ──
             Clip to the diamond so buildings don't overflow the platform edges.
@@ -268,11 +297,19 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
       {/* Hover effect via global style */}
       <style>{`
         .iso-compound {
-          transition: transform 0.22s ease, filter 0.22s ease;
+          transition: filter 0.22s ease;
         }
         .iso-compound:hover {
-          transform: translateY(-10px);
           filter: drop-shadow(0 12px 24px rgba(0,0,0,0.25));
+        }
+        .iso-compound .corner-pillars {
+          opacity: 0;
+          transform: translateY(8px);
+          transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+        .iso-compound:hover .corner-pillars {
+          opacity: 1;
+          transform: translateY(0);
         }
       `}</style>
     </div>
