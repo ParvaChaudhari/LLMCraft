@@ -17,6 +17,11 @@ export default function DashboardPage() {
   const [editingNameValue, setEditingNameValue] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
 
+  // Execution State
+  const [isRunning, setIsRunning] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   // Pan and Zoom state for custom canvas
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -129,6 +134,97 @@ export default function DashboardPage() {
       console.error(error);
     }
     setIsSavingName(false);
+  };
+
+  const handleRun = async () => {
+    if (isRunning || !selectedWorkflow) return;
+
+    const nodes = selectedWorkflow.graph_json?.nodes || [];
+    const edges = selectedWorkflow.graph_json?.edges || [];
+    
+    const startNode = nodes.find((n: any) => n.type === 'webhook');
+    if (!startNode) {
+      alert("Missing Radio Tower (Webhook) trigger! Cannot run city.");
+      return;
+    }
+
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
+    setIsRunning(true);
+    setLogs([
+      `> System initialized.`,
+      `> Found ${nodes.length} structures.`,
+      `> Initiating deployment sequence...`,
+      `> Booting ${startNode.type}...`
+    ]);
+
+    try {
+      const res = await fetch('/api/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodes, edges }),
+      });
+
+      let resData;
+      const rawText = await res.text();
+      try {
+        resData = JSON.parse(rawText);
+      } catch (e) {
+        throw new Error(`Server returned invalid JSON (Status: ${res.status})`);
+      }
+
+      if (!res.ok) throw new Error(resData.error || 'Execution failed');
+      if (!resData.workflowId) throw new Error('No workflowId returned');
+
+      const eventSource = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
+      eventSourceRef.current = eventSource;
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          const { event: eventName, data: eventData } = payload;
+          
+          if (eventName === 'NODE_STARTED') {
+            const node = nodes.find((n: any) => n.id === eventData.nodeId);
+            setLogs(prev => [...prev, `> Executing ${node?.name || node?.type || 'node'}...`]);
+          } 
+          else if (eventName === 'NODE_FINISHED') {
+            const node = nodes.find((n: any) => n.id === eventData.nodeId);
+            setLogs(prev => [...prev, `> Finished ${node?.name || node?.type || 'node'}.`]);
+            
+            if (eventData.type === 'output') {
+              setLogs(prev => [...prev, `> Output:`]);
+              setLogs(prev => [...prev, JSON.stringify(eventData.output, null, 2)]);
+              
+              setLogs(prev => [...prev, `> Execution complete.`]);
+              setIsRunning(false);
+              eventSource.close();
+            } else if (eventData.isLastNode) {
+              setLogs(prev => [...prev, `> Execution complete.`]);
+              setIsRunning(false);
+              eventSource.close();
+            }
+          }
+
+          else if (eventName === 'NODE_ERROR') {
+             setLogs(prev => [...prev, `> ERROR: ${eventData.error}`]);
+             setIsRunning(false);
+             eventSource.close();
+          }
+        } catch(e) {}
+      };
+
+      eventSource.onerror = () => {
+        setIsRunning(false);
+        eventSource.close();
+      };
+
+    } catch (err: any) {
+      setLogs(prev => [...prev, `> ERROR: ${err.message}`]);
+      setIsRunning(false);
+    }
   };
 
   const handleDeleteSector = async () => {
@@ -365,14 +461,18 @@ export default function DashboardPage() {
                 >
                   DELETE
                 </button>
-                <button style={{
-                  flex: 1, background: '#1d1b1a', color: '#00e639', border: '2px solid #1d1b1a', padding: '10px',
-                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
+                <button 
+                  onClick={handleRun}
+                  disabled={isRunning}
+                  style={{
+                  flex: 1, background: isRunning ? '#333' : '#1d1b1a', color: isRunning ? '#888' : '#00e639', border: '2px solid #1d1b1a', padding: '10px',
+                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: isRunning ? 'default' : 'pointer', boxShadow: isRunning ? 'none' : '2px 2px 0 #1d1b1a',
+                  transform: isRunning ? 'translate(2px,2px)' : 'none'
                 }}
-                  onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
-                  onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+                  onMouseDown={e => { if (!isRunning) { e.currentTarget.style.transform = 'translate(2px,2px)'; e.currentTarget.style.boxShadow = 'none'; } }}
+                  onMouseUp={e => { if (!isRunning) { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a'; } }}
                 >
-                  START
+                  {isRunning ? 'RUNNING...' : 'START'}
                 </button>
               </div>
             </div>
@@ -383,17 +483,29 @@ export default function DashboardPage() {
               boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column',
               overflow: 'hidden',
             }}>
-              <div style={{ padding: '6px 10px', borderBottom: '2px solid #1d1b1a', fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.08em' }}>
-                CITY_LOGS.EXE
+              <div style={{ padding: '6px 10px', borderBottom: '2px solid #1d1b1a', fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.08em', display: 'flex', justifyContent: 'space-between' }}>
+                <span>CITY_LOGS.EXE</span>
+                {isRunning && <span className="material-symbols-outlined animate-spin" style={{ fontSize: 12 }}>sync</span>}
               </div>
               <div style={{
                 flex: 1, padding: '10px', overflowY: 'auto',
                 fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: '1.6',
                 color: '#c8c6c6', display: 'flex', flexDirection: 'column', gap: 6,
+                whiteSpace: 'pre-wrap'
               }}>
-                <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
-                <div>&gt; Found {selectedWorkflow.graph_json?.nodes?.length || 0} structures.</div>
-                <div>&gt; Awaiting deployment sequence...</div>
+                {logs.length === 0 ? (
+                  <>
+                    <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
+                    <div>&gt; Found {selectedWorkflow.graph_json?.nodes?.length || 0} structures.</div>
+                    <div>&gt; Awaiting deployment sequence...</div>
+                  </>
+                ) : (
+                  logs.map((log, i) => (
+                    <div key={i} style={{ color: log.includes('ERROR') ? '#ff5555' : log.includes('>') ? '#00e639' : '#c8c6c6' }}>
+                      {log}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </aside>
@@ -484,6 +596,7 @@ export default function DashboardPage() {
                           setSelectedWorkflow(wf);
                           setIsEditingName(false);
                           setEditingNameValue(wf.name || '');
+                          setLogs([]); // Reset the logs for the newly selected city
 
                           // Smooth pan camera to center this city
                           setIsCentering(true);

@@ -6,7 +6,7 @@ interface IsometricCompoundProps {
     name?: string;
     graph_json?: { nodes?: any[] };
   };
-  onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onClick: (e: any) => void;
 }
 
 /**

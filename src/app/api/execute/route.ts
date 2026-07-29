@@ -12,7 +12,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No starting Webhook node found." }, { status: 400 });
     }
 
-    // Push the first job to the queue
+    // Push the first job to the queue with a slight delay
+    // This gives the client time to establish the SSE connection before events fire
     const workflowId = `exec-${Date.now()}`;
     await workflowQueue.add('execute-node', {
       workflowId,
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
       nodes,
       edges,
       context: {}
-    });
+    }, { delay: 500 });
 
     return NextResponse.json({ message: "Workflow queued successfully!", workflowId });
   } catch (error: any) {

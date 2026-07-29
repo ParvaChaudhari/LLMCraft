@@ -105,18 +105,23 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         return;
       }
 
-      let query = supabase
-        .from('workflows')
-        .select('*')
-        .eq('user_id', user.id);
-        
+      let data, error;
       if (cityId) {
-        query = query.eq('id', cityId).single();
+        ({ data, error } = await supabase
+          .from('workflows')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('id', cityId)
+          .single());
       } else {
-        query = query.order('created_at', { ascending: false }).limit(1).single();
+        ({ data, error } = await supabase
+          .from('workflows')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single());
       }
-
-      const { data, error } = await query;
 
       if (data && data.graph_json) {
         setNodes(data.graph_json.nodes || []);
@@ -373,8 +378,9 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
             } 
             else if (eventName === 'NODE_FINISHED') {
               setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
-              if (eventData.type === 'output') {
+              if (eventData.isLastNode) {
                 setIsRunning(false);
+                eventSource.close();
               }
             }
             else if (eventName === 'EDGE_TRAVERSED') {
