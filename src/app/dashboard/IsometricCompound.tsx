@@ -59,13 +59,13 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
     claudeFactory:   'claude_factory.png',
     dbSilo:          'db_silo.png',
     httpRequest:     'http_request.png',
-    library:         'library.png',
+    documentParser:  'library.png',
     artStudio:       'art_studio.png',
     customWorkshop:  'custom_workshop.png',
     bankVault:       'bank-vault.png',
     apify:           'drone_hub.png',
-    sortingFacility: 'sorting_facility.png',
-    printShop:       'print_shop.png',
+    jsonParser:      'sorting_facility.png',
+    webScraper:      'print_shop.png',
     powerPlant:      'power_plant.png',
     watchtower:      'watchtower.png',
     output:          'output_dock.png',
@@ -75,7 +75,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
     //   conditional, limitToll
   };
 
-  // Get up to 6 unique "important" node types from the workflow
+  // Get up to 6 unique "important" nodes from the workflow
   const nodes = workflow.graph_json?.nodes ?? [];
   const seenTypes = new Set<string>();
   const buildingAssets: string[] = [];
@@ -208,32 +208,28 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         </g>
 
         {/* ── BUILDING SPRITES ──
-            Clip to the diamond so buildings don't overflow the platform edges.
-            Each sprite stands upright — bottom-center anchored to its surface position. */}
-        <defs>
-          <clipPath id={`diamond-clip-${workflow.id}`}>
-            <polygon points={topFace} />
-          </clipPath>
-        </defs>
-
-        <g clipPath={`url(#diamond-clip-${workflow.id})`}>
-          {buildingAssets.map((asset, i) => {
-            const pos = buildingPositions[i];
-            if (!pos) return null;
-            const x = pos.cx - imgSize / 2;
-            const y = pos.cy - imgSize;   // bottom-center anchoring
-            return (
-              <image
-                key={asset}
-                href={`/assets/${asset}`}
-                x={x}
-                y={y}
-                width={imgSize}
-                height={imgSize}
-                preserveAspectRatio="xMidYMax meet"
-                style={{ imageRendering: 'auto' }}
-              />
-            );
+            Each sprite stands upright — bottom-center anchored to its surface position. 
+            They are sorted by their Y (isometric depth) coordinate so front buildings render on top. */}
+        <g>
+          {buildingAssets
+            .map((asset, i) => ({ asset, pos: buildingPositions[i] }))
+            .filter(item => item.pos)
+            .sort((a, b) => a.pos.cy - b.pos.cy)
+            .map(({ asset, pos }) => {
+              const x = pos.cx - imgSize / 2;
+              const y = pos.cy - imgSize;   // bottom-center anchoring
+              return (
+                <image
+                  key={asset}
+                  href={`/assets/${asset}`}
+                  x={x}
+                  y={y}
+                  width={imgSize}
+                  height={imgSize}
+                  preserveAspectRatio="xMidYMax meet"
+                  style={{ imageRendering: 'auto' }}
+                />
+              );
           })}
         </g>
 
@@ -243,39 +239,50 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
             appears coplanar with the left wall — facing the same direction. */}
         <g>
           {(() => {
-            // Placed directly on the left wall
             const bW = 160;  // width of sign panel
-            const bH = 14;   // height of sign panel
+            const bH = 28;   // height of sign panel
+            const thick = 3; // 3D thickness
             
             // Center it horizontally on the left wall (left wall goes from x=0 to x=rW/2)
             const ax = (rW / 2 - bW) / 2;
             
-            // ay is the bottom-left corner of the sign
-            // Left wall top edge at ax is: left.y + ax * 0.5
-            // Left wall bottom edge at ax is: left.y + ax * 0.5 + wallH
-            // Center the 14px high sign vertically in the 18px tall wall:
-            // top margin = (18 - 14) / 2 = 2px
-            const ay = left.y + ax * 0.5 + 2 + bH;
-
+            // Push upwards: align bottom edge slightly below the top edge of the wall
+            const topEdgeY = left.y + ax * 0.5;
+            const ay = topEdgeY + 18; // sticks down 8px, sticks up 20px
+            
             const slope = 0.5; // same as left wall: 1px down per 2px right
 
-            // Four corners of the sign face parallelogram
+            // Back face corners (flush with wall)
             const bl = { x: ax,      y: ay };
             const br = { x: ax + bW, y: ay + bW * slope };
             const tr = { x: ax + bW, y: ay + bW * slope - bH };
             const tl = { x: ax,      y: ay - bH };
 
-            const signPoints = `${tl.x},${tl.y} ${tr.x},${tr.y} ${br.x},${br.y} ${bl.x},${bl.y}`;
+            // Front face corners (extruded outward)
+            const ox = -thick;
+            const oy = thick * 0.5;
+            const f_bl = { x: bl.x + ox, y: bl.y + oy };
+            const f_br = { x: br.x + ox, y: br.y + oy };
+            const f_tr = { x: tr.x + ox, y: tr.y + oy };
+            const f_tl = { x: tl.x + ox, y: tl.y + oy };
+
+            const frontPoints = `${f_tl.x},${f_tl.y} ${f_tr.x},${f_tr.y} ${f_br.x},${f_br.y} ${f_bl.x},${f_bl.y}`;
+            const topPoints = `${f_tl.x},${f_tl.y} ${f_tr.x},${f_tr.y} ${tr.x},${tr.y} ${tl.x},${tl.y}`;
+            const rightPoints = `${f_tr.x},${f_tr.y} ${f_br.x},${f_br.y} ${br.x},${br.y} ${tr.x},${tr.y}`;
 
             return (
               <>
-                {/* Sign face */}
-                <polygon points={signPoints} fill="#1d2b38" stroke="#4e7a9e" strokeWidth="1" />
+                {/* 3D Sides */}
+                <polygon points={topPoints} fill="#2a3f52" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
+                <polygon points={rightPoints} fill="#121b24" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
+                
+                {/* Front Face */}
+                <polygon points={frontPoints} fill="#1d2b38" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
 
-                {/* Name text — positioned at the visual centre of the parallelogram */}
+                {/* Name text — positioned at the visual centre of the front face */}
                 {(() => {
-                  const cx = ax + bW / 2;
-                  const cy = ay - bH / 2 + (bW * slope) / 2;
+                  const cx = f_bl.x + bW / 2;
+                  const cy = f_bl.y - bH / 2 + (bW * slope) / 2;
                   const angle = Math.atan(slope) * (180 / Math.PI);
                   return (
                     <g transform={`translate(${cx}, ${cy}) skewY(${angle})`}>
@@ -286,7 +293,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
                         dominantBaseline="middle"
                         fill="#a8c4d8"
                         fontFamily="JetBrains Mono, monospace"
-                        fontSize="8"
+                        fontSize="16"
                         fontWeight="700"
                         letterSpacing="0.12em"
                       >

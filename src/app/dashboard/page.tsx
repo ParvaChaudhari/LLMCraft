@@ -273,6 +273,35 @@ export default function DashboardPage() {
           return { ...wf, gridR: r, gridC: c };
         });
         setWorkflows(scatteredData);
+
+        // Auto-center and zoom to fit all cities
+        if (scatteredData.length > 0 && typeof window !== 'undefined') {
+          let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+          scatteredData.forEach(wf => {
+            const isoX = (wf.gridC - wf.gridR) * 450;
+            const isoY = (wf.gridC + wf.gridR) * 300;
+            if (isoX < minX) minX = isoX;
+            if (isoX > maxX) maxX = isoX;
+            if (isoY < minY) minY = isoY;
+            if (isoY > maxY) maxY = isoY;
+          });
+
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+          
+          const paddingX = 1000; // Account for city width + screen padding
+          const paddingY = 800;
+          const contentW = (maxX - minX) + paddingX;
+          const contentH = (maxY - minY) + paddingY;
+          
+          const zoomX = window.innerWidth / contentW;
+          const zoomY = window.innerHeight / contentH;
+          let calculatedZoom = Math.min(zoomX, zoomY, 1.0); // max zoom 1.0 looks good
+          calculatedZoom = Math.max(calculatedZoom, 0.2); // min zoom 0.2
+          
+          setPan({ x: -centerX * calculatedZoom, y: -centerY * calculatedZoom });
+          setZoom(calculatedZoom);
+        }
       }
       setLoading(false);
     }
@@ -627,16 +656,16 @@ export default function DashboardPage() {
         zIndex: 50,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 10, fontWeight: 700, color: '#4b463e', letterSpacing: '0.06em' }}>
-          <span>© 2024 LLMCRAFT INDUSTRIAL. ALL RIGHTS RESERVED.</span>
+          <span>TOTAL CITIES: {workflows.length}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#006e16' }}>
             <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#23ff47', border: '1px solid #006e16' }} />
             SYSTEM_LIVE
           </div>
         </div>
-        <nav style={{ display: 'flex', gap: 16, fontSize: 10, fontWeight: 700 }}>
-          <a href="#" style={{ color: '#4b463e', textDecoration: 'none' }}>PRIVACY</a>
-          <a href="#" style={{ color: '#4b463e', textDecoration: 'none' }}>LICENSE</a>
-          <a href="#" style={{ color: '#006e16', textDecoration: 'none' }}>DEB_LOGS</a>
+        <nav style={{ display: 'flex', gap: 16, fontSize: 10, fontWeight: 700, color: '#4b463e' }}>
+          <span>SCROLL TO ZOOM</span>
+          <span>•</span>
+          <span>DRAG TO PAN</span>
         </nav>
       </footer>
 
