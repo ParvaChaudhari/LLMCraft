@@ -7,6 +7,7 @@ interface IsometricCompoundProps {
     graph_json?: { nodes?: any[] };
   };
   onClick: (e: any) => void;
+  selected?: boolean;
 }
 
 /**
@@ -22,7 +23,7 @@ interface IsometricCompoundProps {
  *   rW = 256, rH = 128 (2:1 isometric ratio)
  *   wallH = 32 (height of the side walls / depth of the tray)
  */
-export default function IsometricCompound({ workflow, onClick }: IsometricCompoundProps) {
+export default function IsometricCompound({ workflow, onClick, selected }: IsometricCompoundProps) {
   const name = workflow.name || 'Unnamed City';
 
   // ── Core geometry ──────────────────────────────────────────
@@ -104,7 +105,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
     { cx: rW * 0.22, cy: rH * 0.70 },  // row 2 left
     { cx: rW * 0.72, cy: rH * 0.65 },  // row 2 right
     { cx: rW * 0.38, cy: rH * 0.85 },  // row 3 left
-    { cx: rW * 0.58, cy: rH * 0.88 },  // row 3 right
+    { cx: rW * 0.58, cy: rH * 0.92 },  // row 3 right
   ];
 
   return (
@@ -118,7 +119,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
         style={{ overflow: 'visible', display: 'block' }}
       >
         <g 
-          className="iso-compound" 
+          className={`iso-compound ${selected ? 'selected' : ''}`} 
           onClick={onClick} 
           style={{ cursor: 'pointer', pointerEvents: 'auto' }}
         >
@@ -178,9 +179,9 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
           style={{ pointerEvents: 'none' }}
         />
 
-        {/* ── CORNER PILLARS & WIREFRAME ── */}
+        {/* ── TRANSPARENT BACK WALLS ── 
+            Rendered before buildings so they don't overlay the buildings. */}
         <g className="corner-pillars" style={{ pointerEvents: 'none' }}>
-          {/* Transparent Lime Back Walls */}
           <polygon
             points={`${left.x},${left.y} ${top.x},${top.y} ${top.x},${top.y - 16} ${left.x},${left.y - 16}`}
             fill="rgba(35, 255, 71, 0.4)"
@@ -188,22 +189,6 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
           <polygon
             points={`${top.x},${top.y} ${right.x},${right.y} ${right.x},${right.y - 16} ${top.x},${top.y - 16}`}
             fill="rgba(35, 255, 71, 0.25)"
-          />
-
-          {/* Vertical poles */}
-          <g stroke="#66ff00" strokeWidth="2" strokeLinecap="round">
-            <line x1={top.x} y1={top.y} x2={top.x} y2={top.y - 16} />
-            <line x1={right.x} y1={right.y} x2={right.x} y2={right.y - 16} />
-            <line x1={bottom.x} y1={bottom.y} x2={bottom.x} y2={bottom.y - 16} />
-            <line x1={left.x} y1={left.y} x2={left.x} y2={left.y - 16} />
-          </g>
-          {/* Connecting top wireframe */}
-          <polygon
-            points={`${top.x},${top.y - 16} ${right.x},${right.y - 16} ${bottom.x},${bottom.y - 16} ${left.x},${left.y - 16}`}
-            fill="none"
-            stroke="#66ff00"
-            strokeWidth="1"
-            strokeLinejoin="round"
           />
         </g>
 
@@ -231,6 +216,37 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
                 />
               );
           })}
+        </g>
+
+        {/* ── CORNER PILLARS & FRONT WIREFRAME ── 
+            Rendered after buildings so the front walls and lime border appear on top. */}
+        <g className="corner-pillars" style={{ pointerEvents: 'none' }}>
+
+          {/* Front Walls */}
+          <polygon
+            points={`${right.x},${right.y} ${bottom.x},${bottom.y} ${bottom.x},${bottom.y - 16} ${right.x},${right.y - 16}`}
+            fill="rgba(35, 255, 71, 0.15)"
+          />
+          <polygon
+            points={`${bottom.x},${bottom.y} ${left.x},${left.y} ${left.x},${left.y - 16} ${bottom.x},${bottom.y - 16}`}
+            fill="rgba(35, 255, 71, 0.25)"
+          />
+
+          {/* Vertical poles */}
+          <g stroke="#66ff00" strokeWidth="2" strokeLinecap="round">
+            <line x1={top.x} y1={top.y} x2={top.x} y2={top.y - 16} />
+            <line x1={right.x} y1={right.y} x2={right.x} y2={right.y - 16} />
+            <line x1={bottom.x} y1={bottom.y} x2={bottom.x} y2={bottom.y - 16} />
+            <line x1={left.x} y1={left.y} x2={left.x} y2={left.y - 16} />
+          </g>
+          {/* Connecting top wireframe */}
+          <polygon
+            points={`${top.x},${top.y - 16} ${right.x},${right.y - 16} ${bottom.x},${bottom.y - 16} ${left.x},${left.y - 16}`}
+            fill="none"
+            stroke="#66ff00"
+            strokeWidth="1"
+            strokeLinejoin="round"
+          />
         </g>
 
         {/* ── BILLBOARD ──
@@ -322,6 +338,7 @@ export default function IsometricCompound({ workflow, onClick }: IsometricCompou
           transform: translateY(8px);
           transition: opacity 0.22s ease, transform 0.22s ease;
         }
+        .iso-compound.selected .corner-pillars,
         .iso-compound:hover .corner-pillars {
           opacity: 1;
           transform: translateY(0);

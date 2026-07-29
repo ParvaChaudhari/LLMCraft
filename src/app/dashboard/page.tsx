@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import IsometricCompound from './IsometricCompound';
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   // Pan and Zoom state for custom canvas
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  const [defaultView, setDefaultView] = useState({ pan: { x: 0, y: 0 }, zoom: 1 });
   const [isDragging, setIsDragging] = useState(false);
   const [isCentering, setIsCentering] = useState(false);
   const startMouse = useRef({ x: 0, y: 0 });
@@ -241,6 +242,26 @@ export default function DashboardPage() {
     router.push('/login');
   };
 
+  const handleCloseSidebar = useCallback(() => {
+    if (selectedWorkflow) {
+      setSelectedWorkflow(null);
+      setIsCentering(true);
+      setPan(defaultView.pan);
+      setZoom(defaultView.zoom);
+    }
+  }, [selectedWorkflow, defaultView]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't close if they are typing in an input (like renaming the city)
+      if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement)) {
+        handleCloseSidebar();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleCloseSidebar]);
+
   useEffect(() => {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -299,8 +320,10 @@ export default function DashboardPage() {
           let calculatedZoom = Math.min(zoomX, zoomY, 1.0); // max zoom 1.0 looks good
           calculatedZoom = Math.max(calculatedZoom, 0.2); // min zoom 0.2
           
-          setPan({ x: -centerX * calculatedZoom, y: -centerY * calculatedZoom });
+          const initialPan = { x: -centerX * calculatedZoom, y: -centerY * calculatedZoom };
+          setPan(initialPan);
           setZoom(calculatedZoom);
+          setDefaultView({ pan: initialPan, zoom: calculatedZoom });
         }
       }
       setLoading(false);
@@ -454,7 +477,7 @@ export default function DashboardPage() {
                 </div>
               </div>
               <button
-                onClick={() => setSelectedWorkflow(null)}
+                onClick={handleCloseSidebar}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#665e4b' }}
               >
                 <span className="material-symbols-outlined">close</span>
@@ -621,15 +644,18 @@ export default function DashboardPage() {
                     }}>
                       <IsometricCompound
                         workflow={wf}
+                        selected={selectedWorkflow?.id === wf.id}
                         onClick={() => {
                           setSelectedWorkflow(wf);
                           setIsEditingName(false);
                           setEditingNameValue(wf.name || '');
                           setLogs([]); // Reset the logs for the newly selected city
 
-                          // Smooth pan camera to center this city
+                          // Smooth pan camera to center this city and zoom in
+                          // Offset by +160 to center in the remaining space next to the 320px sidebar
                           setIsCentering(true);
-                          setPan({ x: -isoX * zoom, y: -isoY * zoom });
+                          setZoom(1.5);
+                          setPan({ x: -isoX * 1.5 + 160, y: -isoY * 1.5 });
                         }}
                       />
                     </div>
