@@ -440,14 +440,6 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
 
       {/* Top right Buttons */}
       <div className="absolute top-4 right-4 z-10 flex gap-4 items-center">
-        <button
-          onClick={() => router.push('/dashboard')}
-          className="h-12 px-4 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-variant)] tactile-button transition-colors font-bold font-[family-name:var(--font-code-sm)] text-sm gap-2"
-          title="Return to World Dashboard"
-        >
-          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-          DASHBOARD
-        </button>
         {/* Hardware Slider Toggle */}
         <div 
           className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-80 h-12 cursor-pointer"
@@ -507,6 +499,15 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
             )}
           </button>
         </div>
+        
+        <button
+          onClick={() => router.push('/dashboard')}
+          className="h-12 px-4 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-variant)] tactile-button transition-colors font-bold font-[family-name:var(--font-code-sm)] text-sm gap-2"
+          title="Return to World Dashboard"
+        >
+          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+          DASHBOARD
+        </button>
       </div>
 
       {/* Sliding Side Panel */}

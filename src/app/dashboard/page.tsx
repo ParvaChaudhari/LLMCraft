@@ -416,29 +416,17 @@ export default function DashboardPage() {
 
         {/* ── LEFT SIDEBAR ── */}
         {selectedWorkflow && (
-          <aside style={{
-            position: 'absolute',
-            top: 0, bottom: 0, left: 0,
-            width: 320,
-            background: '#f2edea',
-            borderRight: '2px solid #1d1b1a',
-            display: 'flex',
-            flexDirection: 'column',
-            zIndex: 40,
-          }}>
+          <aside className="absolute top-0 bottom-0 left-0 w-[320px] bg-[var(--color-surface)] border-r-2 border-[var(--color-on-surface)] shadow-[4px_0_0_0_rgba(0,0,0,1)] flex flex-col z-40 bevel-container">
             {/* City Header */}
-            <div style={{ padding: '20px 16px', borderBottom: '2px solid #cdc6ba', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{
-                  width: 48, height: 48,
-                  background: '#e8dcc4', border: '2px solid #1d1b1a', boxShadow: '2px 2px 0 #1d1b1a',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <span className="material-symbols-outlined" style={{ fontSize: 24, color: '#665e4b' }}>location_city</span>
+            <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-md)] flex justify-between items-start relative overflow-hidden">
+              <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
+              <div className="flex items-center gap-3 relative z-10 w-full">
+                <div className="w-12 h-12 bg-[var(--color-primary-container)] border-2 border-[var(--color-on-surface)] shadow-[2px_2px_0_var(--color-on-surface)] flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-2xl text-[var(--color-on-primary-container)]" style={{ fontVariationSettings: "'FILL' 1" }}>domain</span>
                 </div>
-                <div>
+                <div className="flex-1 min-w-0">
                   {isEditingName ? (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div className="flex items-center gap-2">
                       <input
                         autoFocus
                         value={editingNameValue}
@@ -447,86 +435,62 @@ export default function DashboardPage() {
                           if (e.key === 'Enter') handleRenameCity();
                           if (e.key === 'Escape') setIsEditingName(false);
                         }}
-                        style={{
-                          background: '#fff', border: '2px solid #1d1b1a', padding: '2px 6px',
-                          fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700,
-                          color: '#1d1b1a', width: 140, outline: 'none'
-                        }}
+                        className="bg-[var(--color-surface)] border-2 border-[var(--color-on-surface)] px-1 py-0.5 font-[family-name:var(--font-code-sm)] text-sm font-bold text-[var(--color-on-surface)] w-full outline-none bevel-inset"
                       />
-                      <button onClick={handleRenameCity} disabled={isSavingName} style={{
-                        background: '#23ff47', border: '2px solid #1d1b1a', padding: '2px 6px',
-                        cursor: 'pointer', fontFamily: 'JetBrains Mono', fontWeight: 700, fontSize: 10
-                      }}>SAVE</button>
+                      <button onClick={handleRenameCity} disabled={isSavingName} className="bg-[var(--color-primary)] border-2 border-[var(--color-on-surface)] px-1 py-0.5 cursor-pointer font-[family-name:var(--font-code-sm)] font-bold text-[10px] text-[var(--color-on-primary)] shrink-0 retro-btn">
+                        SAVE
+                      </button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', color: '#1d1b1a', textTransform: 'uppercase' }}>
+                    <div className="flex items-center gap-2">
+                      <div className="text-sm font-bold tracking-wider text-[var(--color-inverse-primary)] uppercase truncate">
                         {selectedWorkflow.name || 'Unnamed City'}
                       </div>
-                      <button onClick={() => { setIsEditingName(true); setEditingNameValue(selectedWorkflow.name || ''); }} style={{
-                        background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-                        display: 'flex', alignItems: 'center', color: '#665e4b'
-                      }} title="Rename City">
-                        <span className="material-symbols-outlined" style={{ fontSize: 14 }}>edit</span>
+                      <button onClick={() => { setIsEditingName(true); setEditingNameValue(selectedWorkflow.name || ''); }} className="bg-transparent border-none cursor-pointer p-0 flex items-center text-[var(--color-surface-variant)] hover:text-white transition-colors" title="Rename City">
+                        <span className="material-symbols-outlined text-sm">edit</span>
                       </button>
                     </div>
                   )}
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#006e16', letterSpacing: '0.08em', marginTop: 4 }}>
-                    STATUS: OFFLINE
+                  <div className="text-[10px] font-bold text-[var(--color-inverse-primary)] opacity-90 tracking-wider mt-1">
+                    STRUCTURES: {selectedWorkflow.graph_json?.nodes?.length || 0}
                   </div>
                 </div>
               </div>
               <button
                 onClick={handleCloseSidebar}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#665e4b' }}
+                className="bg-transparent border-none cursor-pointer text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10 shrink-0 self-start"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
             {/* Actions */}
-            <div style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <button
-                onClick={() => router.push(`/city/${selectedWorkflow.id}`)}
-                style={{
-                  background: '#23ff47', color: '#002203', border: '2px solid #1d1b1a',
-                  padding: '12px', fontFamily: 'JetBrains Mono, monospace', fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', boxShadow: '3px 3px 0 #1d1b1a',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                }}
-                onMouseDown={e => (e.currentTarget.style.transform = 'translate(3px,3px)', e.currentTarget.style.boxShadow = 'none')}
-                onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '3px 3px 0 #1d1b1a')}
-              >
-                <span className="material-symbols-outlined">login</span>
-                ENTER CITY
-              </button>
-
-              <div style={{ display: 'flex', gap: 12 }}>
+            <div className="p-[var(--spacing-gutter-md)] flex flex-col gap-[var(--spacing-gutter-sm)] bg-[var(--color-surface)]">
+              <div className="flex gap-[var(--spacing-gutter-sm)]">
+                <button
+                  onClick={() => router.push(`/city/${selectedWorkflow.id}`)}
+                  className="flex-1 bg-[var(--color-primary)] text-[var(--color-on-primary)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] font-[family-name:var(--font-code-sm)] text-xs font-bold cursor-pointer shadow-[3px_3px_0_var(--color-on-surface)] flex items-center justify-center gap-2 retro-btn"
+                >
+                  <span className="material-symbols-outlined">login</span>
+                  ENTER CITY
+                </button>
                 <button
                   onClick={handleDeleteSector}
-                  style={{
-                    flex: 1, background: '#e4e2e1', color: '#ba1a1a', border: '2px solid #1d1b1a', padding: '10px',
-                    fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: 'pointer', boxShadow: '2px 2px 0 #1d1b1a',
-                  }}
-                  onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
-                  onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+                  className="bg-[var(--color-error)] text-[var(--color-on-error)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] font-[family-name:var(--font-code-sm)] text-xs font-bold cursor-pointer shadow-[3px_3px_0_var(--color-on-surface)] flex items-center justify-center shrink-0 retro-btn"
+                  title="Delete City"
                 >
-                  DELETE
-                </button>
-                <button 
-                  onClick={handleRun}
-                  disabled={isRunning}
-                  style={{
-                  flex: 1, background: isRunning ? '#333' : '#1d1b1a', color: isRunning ? '#888' : '#00e639', border: '2px solid #1d1b1a', padding: '10px',
-                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, cursor: isRunning ? 'default' : 'pointer', boxShadow: isRunning ? 'none' : '2px 2px 0 #1d1b1a',
-                  transform: isRunning ? 'translate(2px,2px)' : 'none'
-                }}
-                  onMouseDown={e => { if (!isRunning) { e.currentTarget.style.transform = 'translate(2px,2px)'; e.currentTarget.style.boxShadow = 'none'; } }}
-                  onMouseUp={e => { if (!isRunning) { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a'; } }}
-                >
-                  {isRunning ? 'RUNNING...' : 'START'}
+                  <span className="material-symbols-outlined">delete</span>
                 </button>
               </div>
+              
+              <button 
+                onClick={handleRun}
+                disabled={isRunning}
+                className="bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] border-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] font-[family-name:var(--font-code-sm)] text-xs font-bold cursor-pointer shadow-[3px_3px_0_var(--color-on-surface)] flex items-center justify-center gap-2 w-full retro-btn disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined">{isRunning ? 'stop' : 'play_arrow'}</span>
+                {isRunning ? 'RUNNING...' : 'EXECUTE'}
+              </button>
             </div>
 
             {/* Logs Window */}
@@ -548,7 +512,6 @@ export default function DashboardPage() {
                 {logs.length === 0 ? (
                   <>
                     <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
-                    <div>&gt; Found {selectedWorkflow.graph_json?.nodes?.length || 0} structures.</div>
                     <div>&gt; Awaiting deployment sequence...</div>
                   </>
                 ) : (
@@ -709,51 +672,32 @@ export default function DashboardPage() {
 
       {/* New Sector Modal */}
       {showNewSectorModal && (
-        <div style={{
-          position: 'fixed', inset: 0, background: 'rgba(29, 27, 26, 0.8)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100,
-        }}>
-          <form onSubmit={handleCreateSector} style={{
-            background: '#e4e2e1', width: 400, border: '2px solid #1d1b1a',
-            boxShadow: '8px 8px 0 rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column',
-          }}>
-            <div style={{
-              background: '#32302e', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              borderBottom: '2px solid #1d1b1a'
-            }}>
-              <span style={{ color: '#00e639', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em' }}>INITIALIZE_NEW_CITY.EXE</span>
-              <button type="button" onClick={() => setShowNewSectorModal(false)} style={{ background: 'none', border: 'none', color: '#c8c6c6', cursor: 'pointer' }}>
+        <div className="fixed inset-0 bg-[var(--color-on-surface)]/80 backdrop-blur-sm flex items-center justify-center z-[100]">
+          <form onSubmit={handleCreateSector} className="w-[400px] bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative z-10">
+            <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex justify-between items-center relative overflow-hidden">
+              <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
+              <div className="flex items-center gap-[var(--spacing-gutter-sm)] relative z-10">
+                <span className="material-symbols-outlined text-[var(--color-inverse-primary)]" style={{ fontVariationSettings: "'FILL' 1" }}>public</span>
+                <span className="font-bold font-[family-name:var(--font-code-sm)] text-[var(--color-inverse-primary)] tracking-tight uppercase">INITIALIZE_NEW_CITY.EXE</span>
+              </div>
+              <button type="button" onClick={() => setShowNewSectorModal(false)} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10 cursor-pointer bg-transparent border-none">
                 <span className="material-symbols-outlined" style={{ fontSize: 18 }}>close</span>
               </button>
             </div>
-            <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <label style={{ fontSize: 11, fontWeight: 700, color: '#4b463e', letterSpacing: '0.08em' }}>CITY NAME:</label>
+            
+            <div className="p-[var(--spacing-gutter-md)] flex flex-col gap-[var(--spacing-gutter-md)]">
+              <label className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-widest">CITY NAME:</label>
               <input
                 autoFocus
                 type="text"
                 value={newSectorName}
                 onChange={e => setNewSectorName(e.target.value)}
                 placeholder="e.g. Neo Tokyo"
-                style={{
-                  background: '#f8f3ef', border: '2px solid #1d1b1a', padding: 12,
-                  fontFamily: 'JetBrains Mono', fontSize: 14, fontWeight: 700, color: '#1d1b1a',
-                  outline: 'none', boxShadow: 'inset 2px 2px 0 rgba(0,0,0,0.1)'
-                }}
+                className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-3 py-2 bevel-inset focus:outline-none placeholder:text-[var(--color-on-surface-variant)]"
               />
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 8 }}>
-                <button type="button" onClick={() => setShowNewSectorModal(false)} style={{
-                  background: 'transparent', border: 'none', cursor: 'pointer',
-                  fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700, color: '#4b463e'
-                }}>CANCEL</button>
-                <button type="submit" disabled={!newSectorName.trim() || isCreating} style={{
-                  background: '#23ff47', color: '#002203', border: '2px solid #1d1b1a',
-                  padding: '10px 24px', fontFamily: 'JetBrains Mono', fontSize: 11, fontWeight: 700,
-                  cursor: isCreating || !newSectorName.trim() ? 'not-allowed' : 'pointer',
-                  boxShadow: '2px 2px 0 #1d1b1a', opacity: isCreating || !newSectorName.trim() ? 0.5 : 1
-                }}>
-                  {isCreating ? 'INITIALIZING...' : 'INITIALIZE'}
-                </button>
-              </div>
+              <button disabled={isCreating || !newSectorName.trim()} type="submit" className="bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold px-4 py-2 border-2 border-[var(--color-on-surface)] retro-btn cursor-pointer w-full mt-2 disabled:opacity-50">
+                {isCreating ? 'INITIALIZING...' : 'START CONSTRUCTION'}
+              </button>
             </div>
           </form>
         </div>
