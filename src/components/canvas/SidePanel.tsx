@@ -112,7 +112,9 @@ export default function SidePanel({
   const [modelsError, setModelsError] = useState<string | null>(null);
   const [isNodeRunning, setIsNodeRunning] = useState(false);
   const [viewAsJson, setViewAsJson] = useState(false);
+  const [terminalLogs, setTerminalLogs] = useState<{time: string, text: string, type: string}[]>([]);
   const nodeEventSourceRef = useRef<EventSource | null>(null);
+  const terminalScrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -123,6 +125,12 @@ export default function SidePanel({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    if (terminalScrollRef.current) {
+      terminalScrollRef.current.scrollTop = terminalScrollRef.current.scrollHeight;
+    }
+  }, [terminalLogs, isNodeRunning]);
 
   const toggleTab = (tabId: string) => {
     setActiveTabs(prev => {
@@ -240,7 +248,8 @@ export default function SidePanel({
   const executeNodeStandalone = async () => {
     if (isNodeRunning) return;
     setIsNodeRunning(true);
-    // Clear current output and show loader
+    // Clear current output, reset logs, and show loader
+    setTerminalLogs([]);
     updateNodeData(selectedNode.id, { output: undefined, isLoading: true });
 
     if (nodeEventSourceRef.current) nodeEventSourceRef.current.close();
@@ -262,10 +271,24 @@ export default function SidePanel({
         try {
           const payload = JSON.parse(event.data);
           const { event: eventName, data: eventData } = payload;
-          if (eventName === 'NODE_FINISHED' && eventData.nodeId === selectedNode.id) {
-            updateNodeData(selectedNode.id, { output: eventData.output, isLoading: false });
-            setIsNodeRunning(false);
-            es.close();
+          
+          const now = new Date();
+          const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+          
+          if (eventName === 'NODE_STARTED') {
+            setTerminalLogs(prev => [...prev, { time: timeStr, text: `Executing Node [${eventData.nodeId}]`, type: 'info' }]);
+          } else if (eventName === 'NODE_FINISHED') {
+            const isError = typeof eventData.output === 'string' && eventData.output.startsWith('Error:');
+            setTerminalLogs(prev => [...prev, { 
+              time: timeStr, 
+              text: isError ? `Execution Failed: ${eventData.output}` : `Execution Complete.`, 
+              type: isError ? 'error' : 'success' 
+            }]);
+            if (eventData.nodeId === selectedNode.id) {
+              updateNodeData(selectedNode.id, { output: eventData.output, isLoading: false });
+              setIsNodeRunning(false);
+              es.close();
+            }
           }
           if (eventName === 'NODE_FINISHED' && eventData.isLastNode) {
             setIsNodeRunning(false);
@@ -277,6 +300,7 @@ export default function SidePanel({
       es.onerror = () => {
         setIsNodeRunning(false);
         updateNodeData(selectedNode.id, { isLoading: false });
+        setTerminalLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Connection error.`, type: 'error' }]);
         es.close();
       };
 
@@ -426,17 +450,17 @@ export default function SidePanel({
               NODE CONFIGURATION // {selectedNode.type}
             </span>
           </div>
-          <button onClick={onClose} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10 p-2">
-            <span className="material-symbols-outlined text-[24px]">close</span>
+          <button onClick={onClose} className="text-[var(--color-surface-variant)] hover:text-white transition-colors relative z-10 flex items-center justify-center w-8 h-8">
+            <span className="material-symbols-outlined text-[24px] leading-none">close</span>
           </button>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 flex flex-row overflow-hidden p-[var(--spacing-gutter-md)] gap-[var(--spacing-gutter-md)] bg-[var(--color-primary-container)]">
 
-          {/* LEFT COLUMN (1/4 Width) - Asset Preview */}
-          <div className="w-1/4 flex flex-col gap-[var(--spacing-gutter-sm)]">
-            <div className="flex-1 bg-[var(--color-inverse-surface)] inset-input flex items-center justify-center relative overflow-hidden p-8" style={{
+          {/* LEFT COLUMN (1/4 Width) - Asset Preview & Terminal */}
+          <div className="w-1/4 flex flex-col gap-[var(--spacing-gutter-sm)] min-w-[280px]">
+            <div className="h-[250px] shrink-0 bg-[var(--color-inverse-surface)] inset-input flex items-center justify-center relative overflow-hidden p-4 min-h-0" style={{
               backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)',
               backgroundSize: '20px 20px',
               backgroundPosition: 'center center'
@@ -474,6 +498,37 @@ export default function SidePanel({
                   )}
                 </button>
               )}
+            </div>
+
+            {/* Terminal Logs Panel */}
+            <div className="flex-1 bg-[#1a1a1a] inset-input flex flex-col overflow-hidden">
+              <div className="bg-[#2d2d2d] px-3 py-1 flex items-center gap-2 border-b-2 border-black shrink-0">
+                <span className="material-symbols-outlined text-[16px] text-gray-400">terminal</span>
+                <span className="text-xs font-bold font-[family-name:var(--font-code-sm)] text-gray-400 uppercase tracking-wider">LIVE TERMINAL</span>
+              </div>
+              <div 
+                ref={terminalScrollRef}
+                className="flex-1 overflow-y-auto p-3 font-[family-name:var(--font-code-sm)] text-xs flex flex-col gap-1 custom-scrollbar text-gray-300"
+              >
+                {terminalLogs.length === 0 ? (
+                  <div className="text-gray-500 italic mt-2 text-center">No execution logs yet.</div>
+                ) : (
+                  terminalLogs.map((log, i) => (
+                    <div key={i} className="flex gap-2">
+                      <span className="text-gray-500 shrink-0">[{log.time}]</span>
+                      <span className={`${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : log.type === 'info' ? 'text-blue-400' : 'text-gray-300'} break-all`}>
+                        {log.text}
+                      </span>
+                    </div>
+                  ))
+                )}
+                {isNodeRunning && (
+                  <div className="flex gap-2 mt-2">
+                    <span className="text-gray-500">[{new Date().toLocaleTimeString()}]</span>
+                    <span className="text-yellow-400 animate-pulse">Running...</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -891,46 +946,45 @@ export default function SidePanel({
                         <div>
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Document File</label>
                           <div className="relative">
-                            <input
-                              type="file"
-                              accept=".pdf,.csv,.txt"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                try {
-                                  updateNodeData(selectedNode.id, { isUploading: true, uploadError: null });
+                            <label className="w-full bg-[var(--color-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)] text-[var(--color-on-surface)] tactile-button py-2 px-4 text-center font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold uppercase transition-colors flex items-center justify-center gap-2 cursor-pointer">
+                              <input
+                                type="file"
+                                accept=".pdf,.csv,.txt"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  try {
+                                    updateNodeData(selectedNode.id, { isUploading: true, uploadError: null });
 
-                                  // Clean up old file if it exists
-                                  if (data.filePath) {
-                                    await fetch('/api/upload', {
-                                      method: 'DELETE',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ fileUrl: data.filePath }),
-                                    }).catch((err) => console.error('Failed to delete old file:', err));
+                                    if (data.filePath) {
+                                      await fetch('/api/upload', {
+                                        method: 'DELETE',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ fileUrl: data.filePath }),
+                                      }).catch((err) => console.error('Failed to delete old file:', err));
+                                    }
+
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                    if (!res.ok) throw new Error('Upload failed');
+                                    const json = await res.json();
+                                    updateNodeData(selectedNode.id, { filePath: json.filePath, fileName: json.fileName, isUploading: false });
+                                  } catch (err: any) {
+                                    updateNodeData(selectedNode.id, { uploadError: err.message, isUploading: false });
                                   }
-
-                                  const formData = new FormData();
-                                  formData.append('file', file);
-                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                  if (!res.ok) throw new Error('Upload failed');
-                                  const json = await res.json();
-                                  updateNodeData(selectedNode.id, { filePath: json.filePath, fileName: json.fileName, isUploading: false });
-                                } catch (err: any) {
-                                  updateNodeData(selectedNode.id, { uploadError: err.message, isUploading: false });
-                                }
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            />
-                            <div className="w-full bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button py-2 px-4 text-center font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold uppercase transition-colors flex items-center justify-center gap-2">
+                                }}
+                                className="hidden"
+                              />
                               {data.isUploading ? (
                                 <>
-                                  <div className="w-4 h-4 border-2 border-[var(--color-on-surface)] border-t-transparent rounded-full animate-spin" />
+                                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                                   Uploading...
                                 </>
                               ) : (
                                 'Choose File'
                               )}
-                            </div>
+                            </label>
                           </div>
                           {data.fileName && (
                             <div className="mt-2 text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold text-[var(--color-on-primary-container)] bg-[var(--color-primary-container)] p-2 bevel-container truncate">

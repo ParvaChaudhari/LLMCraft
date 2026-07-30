@@ -451,8 +451,15 @@ export default function DashboardPage() {
                       </button>
                     </div>
                   )}
-                  <div className="text-[10px] font-bold text-[var(--color-inverse-primary)] opacity-90 tracking-wider mt-1">
-                    STRUCTURES: {selectedWorkflow.graph_json?.nodes?.length || 0}
+                  <div className="flex flex-col gap-1 mt-3">
+                    <div className="text-[10px] font-bold text-[var(--color-inverse-primary)] opacity-90 tracking-wider flex justify-between border-b border-[rgba(0,0,0,0.1)] pb-1">
+                      <span>STRUCTURES:</span>
+                      <span>{selectedWorkflow.graph_json?.nodes?.length || 0}</span>
+                    </div>
+                    <div className="text-[10px] font-bold text-[var(--color-inverse-primary)] opacity-90 tracking-wider flex justify-between border-b border-[rgba(0,0,0,0.1)] pb-1">
+                      <span>CONNECTIONS:</span>
+                      <span>{selectedWorkflow.graph_json?.edges?.length || 0}</span>
+                    </div>
                   </div>
                 </div>
               </div>
