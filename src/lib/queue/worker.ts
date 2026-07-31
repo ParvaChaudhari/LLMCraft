@@ -749,6 +749,87 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'postOffice') {
+    const channel = currentNode.data?.channel || 'discord';
+    const messageTemplate = currentNode.data?.message || '{{lastOutput}}';
+    const message = replaceVariables(messageTemplate, newContext);
+
+    try {
+      if (channel === 'email') {
+        const credentialId = currentNode.data?.credentialId;
+        if (!credentialId) throw new Error('No Resend Credential selected for Email dispatch.');
+        
+        const apiKey = await fetchApiKey(credentialId);
+        if (!apiKey) throw new Error('Failed to load Resend API Key from credential.');
+
+        const toRaw = currentNode.data?.to || '';
+        const subjectRaw = currentNode.data?.subject || 'Workflow Alert';
+        const to = replaceVariables(toRaw, newContext);
+        const subject = replaceVariables(subjectRaw, newContext);
+
+        if (!to) throw new Error('No "To" address provided for Email.');
+
+        console.log(`[Queue] Post Office sending Email to: ${to}`);
+        
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+          },
+          body: JSON.stringify({
+            from: 'onboarding@resend.dev',
+            to: [to],
+            subject: subject,
+            text: message
+          }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`Resend API returned HTTP ${res.status}: ${errText}`);
+        }
+
+        const result = `Email successfully sent to ${to} via Resend.`;
+        newContext.lastOutput = result;
+        newContext[nodeId] = result;
+        console.log(`[Queue] Post Office success: ${result}`);
+
+      } else {
+        // Discord or Slack Webhook
+        const webhookUrl = replaceVariables(currentNode.data?.webhookUrl || '', newContext);
+        if (!webhookUrl) throw new Error('No webhook URL provided for Post Office node.');
+
+        let payload: Record<string, any>;
+        if (channel === 'slack') {
+          payload = { text: message };
+        } else {
+          payload = { content: message };
+        }
+
+        console.log(`[Queue] Post Office sending to ${channel}: ${webhookUrl}`);
+
+        const res = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok && res.status !== 204) {
+          const errText = await res.text();
+          throw new Error(`Webhook returned HTTP ${res.status}: ${errText}`);
+        }
+
+        const result = `Message dispatched via ${channel.toUpperCase()} webhook. Status: ${res.status}`;
+        newContext.lastOutput = result;
+        newContext[nodeId] = result;
+        console.log(`[Queue] Post Office success: ${result}`);
+      }
+    } catch (err: any) {
+      console.error(`[Queue] Post Office Error:`, err.message);
+      newContext.lastOutput = `Error (Post Office): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
