@@ -6,6 +6,8 @@ import { createClient } from '@/lib/supabase/client';
 import {
   ReactFlow,
   Controls,
+  MiniMap,
+  Panel,
   applyNodeChanges,
   applyEdgeChanges,
   addEdge,
@@ -77,6 +79,23 @@ const defaultInitialNodes: Node[] = [];
 
 let id = 0;
 const getId = () => `node_${id++}_${Date.now()}`;
+
+// Custom minimap node — renders a fixed-size blip so isometric nodes
+// don't appear huge and overlapping in the radar view.
+function MinimapBlip({ x, y, width, height, color }: { x: number; y: number; width: number; height: number; color?: string; selected?: boolean; className?: string; style?: React.CSSProperties; }) {
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  return (
+    <rect
+      x={cx - 8}
+      y={cy - 8}
+      width={64}
+      height={64}
+      rx={2}
+      fill={color || '#2a6a2a'}
+    />
+  );
+}
 
 export default function CityCanvas({ cityId }: { cityId?: string }) {
   const [nodes, setNodes] = useState<Node[]>(defaultInitialNodes);
@@ -435,6 +454,68 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         >
           <IsometricBackground />
           {visualMode === 'roads' && <RoadLayer />}
+          <Panel position="bottom-right" style={{ margin: 0, padding: 0 }}>
+            <div
+              className="satellite-minimap-wrapper"
+              style={{
+                border: '2px solid #1a3a1a',
+                boxShadow: '4px 4px 0 0 rgba(0,0,0,1)',
+                background: '#0a1a0a',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Header */}
+              <div style={{
+                background: '#0d2a0d',
+                borderBottom: '2px solid #1a3a1a',
+                padding: '4px 10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+              }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 13, color: '#4ade80' }}>satellite_alt</span>
+                <span style={{
+                  fontFamily: 'var(--font-code-sm)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#4ade80',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase',
+                }}>SATELLITE VIEW</span>
+              </div>
+
+              {/* Scanline overlay */}
+              <div style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: 'repeating-linear-gradient(to bottom, transparent, transparent 3px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px)',
+                pointerEvents: 'none',
+                zIndex: 10,
+              }} />
+
+              <MiniMap
+                pannable
+                zoomable
+                nodeComponent={MinimapBlip}
+                nodeColor={(node) => {
+                  if (node.data?.isLoading) return '#4ade80';
+                  if (node.data?.output) return '#06b6d4';
+                  return '#2a6a2a';
+                }}
+                nodeStrokeWidth={0}
+                maskColor="rgba(0,8,0,0.72)"
+                style={{
+                  background: '#0a1a0a',
+                  margin: 0,
+                  position: 'relative',
+                  display: 'block',
+                  width: 280,
+                  height: 200,
+                }}
+              />
+            </div>
+          </Panel>
         </ReactFlow>
       </div>
 

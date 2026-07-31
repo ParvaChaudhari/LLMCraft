@@ -242,3 +242,51 @@ img {
     opacity: 0.95;
   }
 }
+
+/* ═══════════════════════════════════════
+   SATELLITE MINIMAP — Retro Radar Screen
+   ═══════════════════════════════════════ */
+
+/* Phosphor green background for the map SVG */
+.react-flow__minimap {
+  background: #0a1a0a !important;
+}
+
+/* The viewport rectangle — make it a neon green radar "sweep zone" */
+.react-flow__minimap-mask {
+  fill: rgba(0, 10, 0, 0.7) !important;
+  stroke: #4ade80 !important;
+  stroke-width: 2px !important;
+}
+
+/* Node blips on the radar */
+.react-flow__minimap-node {
+  rx: 1 !important;
+  ry: 1 !important;
+}
+
+/* Scanline overlay on top of the minimap SVG */
+.react-flow__minimap svg {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.15) 2px,
+    rgba(0, 0, 0, 0.15) 4px
+  );
+}
+
+/* Radar sweep animation */
+@keyframes radar-sweep {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes minimap-glow-pulse {
+  0%, 100% { box-shadow: 4px 4px 0 0 rgba(0,0,0,1), 0 0 8px rgba(74,222,128,0.15); }
+  50%       { box-shadow: 4px 4px 0 0 rgba(0,0,0,1), 0 0 18px rgba(74,222,128,0.35); }
+}
+
+.satellite-minimap-wrapper {
+  animation: minimap-glow-pulse 3s ease-in-out infinite;
+}
