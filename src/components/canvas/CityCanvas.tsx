@@ -42,6 +42,7 @@ import SortingFacilityNode from './nodes/SortingFacilityNode';
 import ApifyNode from './nodes/ApifyNode';
 import BankVaultNode from './nodes/BankVaultNode';
 import ArtStudioNode from './nodes/ArtStudioNode';
+import PostOfficeNode from './nodes/PostOfficeNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -67,6 +68,7 @@ const nodeTypes = {
   apify: ApifyNode,
   bankVault: BankVaultNode,
   artStudio: ArtStudioNode,
+  postOffice: PostOfficeNode,
 };
 
 const edgeTypes = {
@@ -510,8 +512,8 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
                   margin: 0,
                   position: 'relative',
                   display: 'block',
-                  width: 280,
-                  height: 200,
+                  width: 200,
+                  height: 150,
                 }}
               />
             </div>

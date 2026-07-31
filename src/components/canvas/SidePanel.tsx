@@ -13,6 +13,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'watchtower') return 'tavily';
   if (nodeType === 'dbSilo' || nodeType === 'bankVault') return 'postgres';
   if (nodeType === 'apify') return 'apify';
+  if (nodeType === 'postOffice') return 'resend';
   return null;
 };
 
@@ -83,6 +84,7 @@ const toolAssets: Record<string, string> = {
   bankVault: 'bank-vault.png',
   artStudio: 'art_studio.png',
   jsonParser: 'sorting_facility.png',
+  postOffice: 'postoffice.png',
 };
 
 export default function SidePanel({
@@ -331,9 +333,10 @@ export default function SidePanel({
 
   const handleInsertVariable = (path: string) => {
     const templateTag = `{{${path}}}`;
-    if (LLM_NODE_TYPES.includes(selectedNode.type) || selectedNode.type === 'artStudio') {
-      const currentPrompt = selectedNode.data?.prompt || '';
-      handleChange('prompt', currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
+    if (LLM_NODE_TYPES.includes(selectedNode.type) || selectedNode.type === 'artStudio' || selectedNode.type === 'postOffice') {
+      const currentPrompt = selectedNode.data?.prompt || selectedNode.data?.message || '';
+      const field = selectedNode.type === 'postOffice' ? 'message' : 'prompt';
+      handleChange(field, currentPrompt + (currentPrompt ? ' ' : '') + templateTag);
     } else if (selectedNode.type === 'httpRequest') {
       const currentBody = selectedNode.data?.body || '';
       handleChange('body', currentBody + (currentBody ? ' ' : '') + templateTag);
@@ -479,7 +482,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -907,6 +910,148 @@ export default function SidePanel({
                             onChange={(e) => handleChange('prompt', e.target.value)}
                             className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
                             placeholder="An isometric building based on: {{lastOutput}}"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'postOffice' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Channel</label>
+                          <div className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-full h-10">
+                            <div
+                              className={`absolute h-8 w-[calc(33.333%-2px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                                (!data.channel || data.channel === 'discord') ? 'left-1' :
+                                data.channel === 'slack' ? 'left-[calc(33.333%+1px)]' :
+                                'left-[calc(66.666%+2px)]'
+                              }`}
+                            />
+                            <div className="relative z-10 flex w-full h-full text-[length:var(--text-label-caps)] font-bold font-[family-name:var(--font-label-caps)] uppercase select-none">
+                              <div
+                                onClick={() => handleChange('channel', 'discord')}
+                                className={`flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all ${(!data.channel || data.channel === 'discord') ? 'text-[var(--color-on-surface)] opacity-100' : 'text-[var(--color-surface-variant)] opacity-50'}`}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>forum</span>
+                                Discord
+                              </div>
+                              <div
+                                onClick={() => handleChange('channel', 'slack')}
+                                className={`flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all ${data.channel === 'slack' ? 'text-[var(--color-on-surface)] opacity-100' : 'text-[var(--color-surface-variant)] opacity-50'}`}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>chat_bubble</span>
+                                Slack
+                              </div>
+                              <div
+                                onClick={() => handleChange('channel', 'email')}
+                                className={`flex-1 flex items-center justify-center gap-2 cursor-pointer transition-all ${data.channel === 'email' ? 'text-[var(--color-on-surface)] opacity-100' : 'text-[var(--color-surface-variant)] opacity-50'}`}
+                              >
+                                <span className="material-symbols-outlined" style={{ fontSize: 14 }}>mail</span>
+                                Email
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {data.channel === 'email' ? (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Resend API Credential</label>
+                              <div className="flex gap-2">
+                                <select
+                                  value={data.credentialId || ''}
+                                  onChange={(e) => handleChange('credentialId', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                                >
+                                  <option value="">-- Select Resend Credential --</option>
+                                  {credentials.filter(c => c.type === 'resend').map(c => (
+                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() => setShowNewCredForm(!showNewCredForm)}
+                                  className="bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button px-4 py-1 font-bold text-[length:var(--text-code-sm)] transition-colors"
+                                >
+                                  {showNewCredForm ? '-' : '+'}
+                                </button>
+                              </div>
+
+                              {showNewCredForm && (
+                                <div className="mt-2 p-4 bg-[var(--color-inverse-surface)] inset-input space-y-4">
+                                  <h4 className="text-[var(--color-inverse-primary)] font-bold text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] uppercase tracking-widest border-b border-[var(--color-on-surface)] pb-2">Create New Credential</h4>
+                                  <div>
+                                    <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">Credential Name</label>
+                                    <input
+                                      type="text"
+                                      value={newCredName}
+                                      onChange={(e) => setNewCredName(e.target.value)}
+                                      placeholder="e.g. Resend Key"
+                                      autoComplete="off"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">API Key</label>
+                                    <input
+                                      type="password"
+                                      value={newCredKey}
+                                      onChange={(e) => setNewCredKey(e.target.value)}
+                                      placeholder="re_..."
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={handleCreateCredential}
+                                    disabled={!newCredName || !newCredKey || isSavingCred}
+                                    className="w-full bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)] font-bold py-2 px-4 uppercase tracking-wider tactile-button disabled:opacity-50"
+                                  >
+                                    {isSavingCred ? 'Saving...' : 'Save & Select'}
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">To Address</label>
+                              <input
+                                type="text"
+                                value={data.to || ''}
+                                onChange={(e) => handleChange('to', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="user@example.com"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Subject</label>
+                              <input
+                                type="text"
+                                value={data.subject || ''}
+                                onChange={(e) => handleChange('subject', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Alert: {{lastOutput}}"
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Webhook URL</label>
+                            <input
+                              type="text"
+                              value={data.webhookUrl || ''}
+                              onChange={(e) => handleChange('webhookUrl', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder={(!data.channel || data.channel === 'discord') ? 'https://discord.com/api/webhooks/...' : 'https://hooks.slack.com/services/...'}
+                            />
+                          </div>
+                        )}
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Message Body</label>
+                          <textarea
+                            value={data.message || '{{lastOutput}}'}
+                            onChange={(e) => handleChange('message', e.target.value)}
+                            className="w-full h-28 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] py-1 px-2 inset-input outline-none resize-y"
+                            placeholder="Workflow complete! Result: {{lastOutput}}"
                           />
                         </div>
                       </div>
