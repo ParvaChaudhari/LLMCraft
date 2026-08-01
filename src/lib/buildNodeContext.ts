@@ -24,7 +24,10 @@ export function buildNodeContext(
       const output = upstreamNode.data?.pinnedOutput ?? upstreamNode.data?.output;
       if (output !== undefined && output !== null) {
         context[upstreamNode.id] = output;
-        context.lastOutput = output; // lastOutput always = most recent upstream
+        // Only set lastOutput if it hasn't been set yet (immediate upstream node wins)
+        if (context.lastOutput === undefined) {
+          context.lastOutput = output;
+        }
       }
 
       walkUpstream(upstreamNode.id);

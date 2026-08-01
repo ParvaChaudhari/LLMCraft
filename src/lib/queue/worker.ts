@@ -100,22 +100,39 @@ const executeNode = async (job: Job) => {
   
   let newContext = { ...context };
 
-  // Limit Node: Toll Booth Counter Check
+  // Limit Node: Array Slicer (array mode) or Toll Booth Counter (single mode)
   if (currentNode.type === 'limit') {
-    newContext.limitCounters = newContext.limitCounters || {};
-    const currentCount = newContext.limitCounters[nodeId] || 0;
     const maxItems = currentNode.data?.maxItems || 1;
-    
-    if (currentCount >= maxItems) {
-      console.log(`[Queue] Limit reached for node ${nodeId} (${currentCount}/${maxItems}). Stopping path.`);
-      newContext.lastOutput = `Limit Reached (${maxItems} items max)`;
-      await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput, isLastNode: true });
-      return; // End execution of this branch
+
+    // Try to parse lastOutput as an array
+    let inputArray: any[] | null = null;
+    try {
+      let raw = (newContext.lastOutput || '').trim();
+      const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+      if (fence) raw = fence[1].trim();
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) inputArray = parsed;
+    } catch (_) {}
+
+    if (inputArray) {
+      // ARRAY MODE: slice the array and pass it forward
+      const sliced = inputArray.slice(0, maxItems);
+      newContext.lastOutput = JSON.stringify(sliced, null, 2);
+      newContext[nodeId] = newContext.lastOutput;
+      console.log(`[Queue] Limit (array mode): sliced ${inputArray.length} → ${sliced.length} items.`);
+    } else {
+      // COUNTER MODE: gate individual executions
+      newContext.limitCounters = newContext.limitCounters || {};
+      const currentCount = newContext.limitCounters[nodeId] || 0;
+      if (currentCount >= maxItems) {
+        console.log(`[Queue] Limit reached for node ${nodeId} (${currentCount}/${maxItems}). Stopping path.`);
+        await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: `Limit Reached (${maxItems} max)`, isLastNode: true });
+        return;
+      }
+      newContext.limitCounters[nodeId] = currentCount + 1;
+      // ✅ Do NOT overwrite lastOutput — data flows through unchanged
+      console.log(`[Queue] Limit (counter mode): passed ${currentCount + 1}/${maxItems}.`);
     }
-    
-    newContext.limitCounters[nodeId] = currentCount + 1;
-    newContext.lastOutput = `Passed Toll Booth (${currentCount + 1}/${maxItems})`;
-    console.log(`[Queue] Passing Limit node ${nodeId}: ${currentCount + 1}/${maxItems}`);
   }
 
   // Pinned Node: Skip execution, use cached output
@@ -144,7 +161,8 @@ const executeNode = async (job: Job) => {
     return;
   }
 
-  // 1. Run specific node logic
+  // 1. Run specific node logic (wrapped so the array engine can call it per-item)
+  const runLogic = async () => {
   if (['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(currentNode.type)) {
     const credentialId = currentNode.data?.credentialId;
     // For Gemini, fallback to process.env if no credentialId is provided
@@ -833,7 +851,82 @@ const executeNode = async (job: Job) => {
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
-    return; // End of line
+    return; // End of line (output node exits here)
+  }
+  // End of runLogic
+  };
+
+  // ─── NATIVE ARRAY ENGINE ─────────────────────────────────────────────────────
+  // If lastOutput is a JSON Array, loop runLogic per item inline (no new queue
+  // jobs), collect all results, then fall through to graph traversal exactly once.
+  // ─────────────────────────────────────────────────────────────────────────────
+  const LOOP_EXEMPT = new Set([
+    'conditional', 'delay', 'webhook', 'limit', 'output',
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault'
+  ]);
+
+  if (!LOOP_EXEMPT.has(currentNode.type)) {
+    let inputArray: any[] | null = null;
+    try {
+      let raw = (newContext.lastOutput || '').trim();
+      const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+      if (fence) raw = fence[1].trim();
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) inputArray = parsed;
+    } catch (_) {}
+
+    if (inputArray) {
+      console.log(`[Queue] Array mode: ${inputArray.length} items → ${currentNode.type} (${nodeId})`);
+      const results: any[] = [];
+
+      // Pre-scan ONCE: find all context keys that currently hold a JSON array.
+      // We do this before the loop so that replacing them in iteration 1 doesn't
+      // prevent them from being updated in iterations 2, 3, etc.
+      const arrayContextKeys = new Set<string>();
+      for (const key of Object.keys(newContext)) {
+        if (typeof newContext[key] === 'string') {
+          try {
+            let raw = (newContext[key] as string).trim();
+            const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+            if (fence) raw = fence[1].trim();
+            if (Array.isArray(JSON.parse(raw))) arrayContextKeys.add(key);
+          } catch (_) {}
+        }
+      }
+
+      for (const item of inputArray) {
+        const itemString = typeof item === 'string' ? item : JSON.stringify(item);
+
+        // Update every pre-identified array key (including lastOutput) with the current item.
+        // This handles {{lastOutput}}, {{apifyNodeId}}, {{limitNodeId}}, etc. in prompts.
+        for (const key of arrayContextKeys) {
+          newContext[key] = itemString;
+        }
+        newContext.lastOutput = itemString;
+
+        await runLogic();
+
+        let rawOutput = newContext.lastOutput ?? '';
+        const match = rawOutput.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+        if (match) rawOutput = match[1].trim();
+        
+        try {
+          results.push(JSON.parse(rawOutput));
+        } catch (e) {
+          results.push(rawOutput);
+        }
+      }
+
+      // Stitch all results back into a single JSON array, then fall through once
+      newContext.lastOutput = JSON.stringify(results, null, 2);
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      // Single item — normal execution
+      await runLogic();
+    }
+  } else {
+    // Exempt node — always runs once
+    await runLogic();
   }
 
   // 2. Find next nodes based on edges
