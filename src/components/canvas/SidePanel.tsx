@@ -85,6 +85,7 @@ const toolAssets: Record<string, string> = {
   artStudio: 'art_studio.png',
   jsonParser: 'sorting_facility.png',
   postOffice: 'postoffice.png',
+  clocktower: 'clocktower.png',
 };
 
 export default function SidePanel({
@@ -245,6 +246,63 @@ export default function SidePanel({
 
   const handleChange = (key: string, value: any) => {
     updateNodeData(selectedNode.id, { [key]: value });
+  };
+
+  const handleDeploySchedule = async () => {
+    if (isNodeRunning) return;
+    setIsNodeRunning(true);
+    setTerminalLogs([]);
+    updateNodeData(selectedNode.id, { isLoading: true });
+
+    try {
+      const res = await fetch('/api/schedule-node', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          nodeId: selectedNode.id, 
+          cronExpression: data.cronExpression,
+          nodes, 
+          edges 
+        }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to deploy schedule');
+
+      setTerminalLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Schedule Deployed: ${data.cronExpression}`, type: 'success' }]);
+      updateNodeData(selectedNode.id, { isLoading: false, isScheduled: true });
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Error: ${err.message}`, type: 'error' }]);
+      updateNodeData(selectedNode.id, { isLoading: false });
+    } finally {
+      setIsNodeRunning(false);
+    }
+  };
+
+  const handleStopSchedule = async () => {
+    if (isNodeRunning) return;
+    setIsNodeRunning(true);
+    setTerminalLogs([]);
+    updateNodeData(selectedNode.id, { isLoading: true });
+
+    try {
+      const res = await fetch('/api/stop-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nodeId: selectedNode.id }),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) throw new Error(resData.error || 'Failed to stop schedule');
+
+      setTerminalLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Schedule Stopped!`, type: 'success' }]);
+      updateNodeData(selectedNode.id, { isLoading: false, isScheduled: false });
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev, { time: new Date().toLocaleTimeString(), text: `Error: ${err.message}`, type: 'error' }]);
+      updateNodeData(selectedNode.id, { isLoading: false });
+    } finally {
+      setIsNodeRunning(false);
+    }
   };
 
   const executeNodeStandalone = async () => {
@@ -1203,8 +1261,8 @@ export default function SidePanel({
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Max Items / Passes</label>
                           <input
                             type="number"
-                            value={data.maxItems || 1}
-                            onChange={(e) => handleChange('maxItems', parseInt(e.target.value))}
+                            value={data.maxItems !== undefined ? data.maxItems : 1}
+                            onChange={(e) => handleChange('maxItems', e.target.value === '' ? '' : parseInt(e.target.value))}
                             className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="1"
                             min="1"
@@ -1213,11 +1271,12 @@ export default function SidePanel({
                         <div>
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Keep</label>
                           <select
-                            disabled
-                            value="first_items"
-                            className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold opacity-50 cursor-not-allowed"
+                            value={data.keepMode || 'first_items'}
+                            onChange={(e) => handleChange('keepMode', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                           >
                             <option value="first_items">First Items</option>
+                            <option value="last_items">Last Items</option>
                           </select>
                         </div>
                       </div>
@@ -1226,6 +1285,38 @@ export default function SidePanel({
                     {selectedNode.type === 'webhook' && (
                       <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">
                         <div>LISTENING FOR TRIGGER</div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'clocktower' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Cron Expression</label>
+                          <input
+                            type="text"
+                            value={data.cronExpression || ''}
+                            onChange={(e) => handleChange('cronExpression', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="*/5 * * * *"
+                          />
+                          <p className="text-xs text-[var(--color-on-surface-variant)] mt-2 italic">Format: minute hour day month day-of-week</p>
+                        </div>
+                        <div className="flex space-x-2 mt-4">
+                          <button
+                            onClick={handleDeploySchedule}
+                            disabled={!data.cronExpression || isNodeRunning}
+                            className="flex-1 relative px-4 py-3 font-bold font-[family-name:var(--font-label-caps)] text-sm uppercase tracking-widest bg-[var(--color-tertiary-container)] text-[var(--color-on-tertiary-container)] hover:bg-[#3ade1d] hover:text-black active:bg-[#2eaa16] active:translate-y-[2px] tactile-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black border-b-4"
+                          >
+                            DEPLOY
+                          </button>
+                          <button
+                            onClick={handleStopSchedule}
+                            disabled={isNodeRunning}
+                            className="flex-1 relative px-4 py-3 font-bold font-[family-name:var(--font-label-caps)] text-sm uppercase tracking-widest bg-red-500 text-white hover:bg-red-600 active:bg-red-700 active:translate-y-[2px] tactile-button transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black border-b-4"
+                          >
+                            STOP
+                          </button>
+                        </div>
                       </div>
                     )}
 

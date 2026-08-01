@@ -49,8 +49,11 @@ import PipeEdge from './PipeEdge';
 import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
+import ClocktowerNode from './nodes/ClocktowerNode';
+
 const nodeTypes = {
   webhook: WebhookNode,
+  clocktower: ClocktowerNode,
   geminiFactory: GeminiFactoryNode,
   chatgptFactory: ChatGPTFactoryNode,
   claudeFactory: ClaudeFactoryNode,

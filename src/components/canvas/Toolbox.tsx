@@ -12,6 +12,7 @@ interface ToolItem {
 
 const toolItems: ToolItem[] = [
   { type: 'webhook',        name: 'Radio Tower',      icon: 'cell_tower', description: 'Triggers the workflow',      longDescription: 'The entry point of your workflow. Starts execution and passes initial payload data to the next connected nodes.', color: '#4ade80', asset: 'webhook_tower.png' },
+  { type: 'clocktower',     name: 'Clocktower',       icon: 'schedule', description: 'Cron Scheduler',         longDescription: 'Trigger your workflow autonomously on a recurring schedule using cron expressions.', color: '#ef4444', asset: 'clocktower.png' },
   { type: 'customWorkshop', name: 'Custom Workshop',  icon: 'precision_manufacturing', description: 'Execute custom logic',       longDescription: 'A secure sandbox for executing raw JavaScript. Manipulate data, transform strings, and perform custom calculations mid-workflow.', color: '#a78bfa', asset: 'custom_workshop.png' },
   { type: 'httpRequest',    name: 'Data Center',      icon: 'dns', description: 'Make HTTP requests',         longDescription: 'Perform generic REST API calls (GET, POST, etc.) to any external service and pull the JSON response into your workflow.', color: '#2dd4bf', asset: 'http_request.png' },
   { type: 'geminiFactory',  name: 'Gemini Factory',   icon: 'smart_toy', description: 'Process with Gemini AI',     longDescription: 'Leverage Google Gemini models to process inputs, generate text, and solve complex reasoning tasks based on a custom prompt.', color: '#60a5fa', asset: 'gemini_factory.png' },

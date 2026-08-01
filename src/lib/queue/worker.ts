@@ -116,7 +116,10 @@ const executeNode = async (job: Job) => {
 
     if (inputArray) {
       // ARRAY MODE: slice the array and pass it forward
-      const sliced = inputArray.slice(0, maxItems);
+      const keepMode = currentNode.data?.keepMode || 'first_items';
+      const sliced = keepMode === 'last_items' 
+        ? inputArray.slice(-maxItems) 
+        : inputArray.slice(0, maxItems);
       newContext.lastOutput = JSON.stringify(sliced, null, 2);
       newContext[nodeId] = newContext.lastOutput;
       console.log(`[Queue] Limit (array mode): sliced ${inputArray.length} → ${sliced.length} items.`);
@@ -848,6 +851,12 @@ const executeNode = async (job: Job) => {
       newContext.lastOutput = `Error (Post Office): ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
     }
+  } else if (currentNode.type === 'clocktower') {
+    const timestamp = new Date().toLocaleString();
+    const result = `Clocktower Scheduled Execution Triggered at ${timestamp}`;
+    newContext.lastOutput = result;
+    newContext[nodeId] = result;
+    console.log(`[Queue] Clocktower triggered: ${result}`);
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
@@ -862,7 +871,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {
