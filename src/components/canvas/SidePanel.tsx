@@ -14,6 +14,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'dbSilo' || nodeType === 'bankVault') return 'postgres';
   if (nodeType === 'apify') return 'apify';
   if (nodeType === 'postOffice') return 'resend';
+  if (nodeType === 'googleDrive') return 'google_drive';
   return null;
 };
 
@@ -86,6 +87,7 @@ const toolAssets: Record<string, string> = {
   jsonParser: 'sorting_facility.png',
   postOffice: 'postoffice.png',
   clocktower: 'clocktower.png',
+  googleDrive: 'gdrive_vault.png',
 };
 
 export default function SidePanel({
@@ -540,7 +542,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -640,7 +642,7 @@ export default function SidePanel({
                     <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault', 'googleDrive'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">
@@ -670,7 +672,7 @@ export default function SidePanel({
                             <div className="mt-2 p-4 bg-[var(--color-inverse-surface)] inset-input space-y-4">
                               <h4 className="text-[var(--color-inverse-primary)] font-bold text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] uppercase tracking-widest border-b border-[var(--color-on-surface)] pb-2">Create New Credential</h4>
                               <div>
-                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">Credential Name</label>
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-inverse-primary)]">Credential Name</label>
                                 <input
                                   type="text"
                                   value={newCredName}
@@ -681,17 +683,26 @@ export default function SidePanel({
                                 />
                               </div>
                               <div>
-                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">
-                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : 'API Key'}
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-inverse-primary)]">
+                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : getCredentialProvider(selectedNode.type) === 'google_drive' ? 'Service Account JSON' : 'API Key'}
                                 </label>
-                                <input
-                                  type="password"
-                                  value={newCredKey}
-                                  onChange={(e) => setNewCredKey(e.target.value)}
-                                  placeholder={getCredentialProvider(selectedNode.type) === 'postgres' ? "postgresql://user:password@host/db" : "sk-..."}
-                                  autoComplete="new-password"
-                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                                />
+                                {getCredentialProvider(selectedNode.type) === 'google_drive' ? (
+                                  <textarea
+                                    value={newCredKey}
+                                    onChange={(e) => setNewCredKey(e.target.value)}
+                                    placeholder='{ "type": "service_account", ... }'
+                                    className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] resize-y custom-scrollbar"
+                                  />
+                                ) : (
+                                  <input
+                                    type="password"
+                                    value={newCredKey}
+                                    onChange={(e) => setNewCredKey(e.target.value)}
+                                    placeholder={getCredentialProvider(selectedNode.type) === 'postgres' ? "postgresql://user:password@host/db" : "sk-..."}
+                                    autoComplete="new-password"
+                                    className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                  />
+                                )}
                               </div>
                               <button
                                 onClick={handleCreateCredential}
@@ -1320,6 +1331,70 @@ export default function SidePanel({
                       </div>
                     )}
 
+
+                    {selectedNode.type === 'googleDrive' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Action</label>
+                          <select
+                            value={data.action || 'read'}
+                            onChange={(e) => handleChange('action', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="read">Read File (.txt)</option>
+                            <option value="create">Create File (.txt)</option>
+                          </select>
+                        </div>
+                        
+                        {(data.action === 'read' || !data.action) && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">File ID</label>
+                            <input
+                              type="text"
+                              value={data.fileId || ''}
+                              onChange={(e) => handleChange('fileId', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder="1BxiMVs0XRY..."
+                            />
+                            <p className="text-xs text-[var(--color-on-surface-variant)] mt-2">The unique ID from the Google Drive URL.</p>
+                          </div>
+                        )}
+
+                        {data.action === 'create' && (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Folder ID (Optional)</label>
+                              <input
+                                type="text"
+                                value={data.folderId || ''}
+                                onChange={(e) => handleChange('folderId', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="1BxiMVs0XRY..."
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">File Name</label>
+                              <input
+                                type="text"
+                                value={data.fileName || ''}
+                                onChange={(e) => handleChange('fileName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="output.txt"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">File Content</label>
+                              <textarea
+                                value={data.content || '{{lastOutput}}'}
+                                onChange={(e) => handleChange('content', e.target.value)}
+                                className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] resize-y custom-scrollbar"
+                                placeholder="{{lastOutput}}"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
 
                     {selectedNode.type === 'output' && (
                       <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">

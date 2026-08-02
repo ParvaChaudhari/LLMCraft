@@ -51,9 +51,12 @@ import IsometricBackground from './IsometricBackground';
 
 import ClocktowerNode from './nodes/ClocktowerNode';
 
+import GoogleDriveNode from './nodes/GoogleDriveNode';
+
 const nodeTypes = {
   webhook: WebhookNode,
   clocktower: ClocktowerNode,
+  googleDrive: GoogleDriveNode,
   geminiFactory: GeminiFactoryNode,
   chatgptFactory: ChatGPTFactoryNode,
   claudeFactory: ClaudeFactoryNode,

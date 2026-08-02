@@ -6,6 +6,7 @@ import { decrypt } from '@/lib/crypto';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
+import { google } from 'googleapis';
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -849,6 +850,89 @@ const executeNode = async (job: Job) => {
     } catch (err: any) {
       console.error(`[Queue] Post Office Error:`, err.message);
       newContext.lastOutput = `Error (Post Office): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
+  } else if (currentNode.type === 'googleDrive') {
+    try {
+      const credentialId = currentNode.data?.credentialId;
+      const apiKeyString = await fetchApiKey(credentialId);
+      
+      if (!apiKeyString) {
+        throw new Error('No Service Account JSON found. Please add it to the Secret Manager.');
+      }
+
+      let serviceAccount;
+      try {
+        serviceAccount = JSON.parse(apiKeyString);
+      } catch (e) {
+        throw new Error('Invalid Service Account JSON.');
+      }
+
+      const auth = new google.auth.GoogleAuth({
+        credentials: {
+          client_email: serviceAccount.client_email,
+          private_key: serviceAccount.private_key,
+        },
+        scopes: ['https://www.googleapis.com/auth/drive'],
+      });
+
+      const drive = google.drive({ version: 'v3', auth });
+      const action = currentNode.data?.action || 'read';
+
+      if (action === 'read') {
+        const rawFileId = currentNode.data?.fileId || '';
+        const fileId = replaceVariables(rawFileId, newContext);
+        if (!fileId) throw new Error('No File ID provided for reading.');
+
+        console.log(`[Queue] Cloud Vault fetching file: ${fileId}`);
+        const res = await drive.files.get({
+          fileId: fileId,
+          alt: 'media',
+        });
+
+        const fileContent = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+        newContext.lastOutput = fileContent;
+        newContext[nodeId] = fileContent;
+        console.log(`[Queue] Cloud Vault successfully fetched file.`);
+      } else if (action === 'create') {
+        const rawFileName = currentNode.data?.fileName || 'output.txt';
+        const rawContent = currentNode.data?.content || '{{lastOutput}}';
+        const rawFolderId = currentNode.data?.folderId || '';
+
+        const fileName = replaceVariables(rawFileName, newContext);
+        const content = replaceVariables(rawContent, newContext);
+        const folderId = replaceVariables(rawFolderId, newContext);
+
+        console.log(`[Queue] Cloud Vault creating file: ${fileName}`);
+
+        const fileMetadata: any = {
+          name: fileName,
+          mimeType: 'text/plain',
+        };
+        if (folderId) {
+          fileMetadata.parents = [folderId];
+        }
+
+        const media = {
+          mimeType: 'text/plain',
+          body: content,
+        };
+
+        const res = await drive.files.create({
+          requestBody: fileMetadata,
+          media: media,
+          fields: 'id',
+        });
+
+        const newFileId = res.data.id;
+        const resultText = `File created successfully. File ID: ${newFileId}`;
+        newContext.lastOutput = resultText;
+        newContext[nodeId] = resultText;
+        console.log(`[Queue] Cloud Vault successfully created file: ${newFileId}`);
+      }
+    } catch (err: any) {
+      console.error(`[Queue] Cloud Vault Error:`, err.message);
+      newContext.lastOutput = `Error (Cloud Vault): ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
     }
   } else if (currentNode.type === 'clocktower') {
