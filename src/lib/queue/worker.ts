@@ -858,23 +858,39 @@ const executeNode = async (job: Job) => {
       const apiKeyString = await fetchApiKey(credentialId);
       
       if (!apiKeyString) {
-        throw new Error('No Service Account JSON found. Please add it to the Secret Manager.');
+        throw new Error('No Google Drive Credentials found. Please add it to the Secret Manager.');
       }
 
-      let serviceAccount;
+      let parsedCreds;
       try {
-        serviceAccount = JSON.parse(apiKeyString);
+        parsedCreds = JSON.parse(apiKeyString);
       } catch (e) {
-        throw new Error('Invalid Service Account JSON.');
+        throw new Error('Invalid JSON provided for Google Drive credentials.');
       }
 
-      const auth = new google.auth.GoogleAuth({
-        credentials: {
-          client_email: serviceAccount.client_email,
-          private_key: serviceAccount.private_key,
-        },
-        scopes: ['https://www.googleapis.com/auth/drive'],
-      });
+      let auth: any;
+
+      if (parsedCreds.refresh_token) {
+        // OAuth 2.0 (User Consent Flow / Playground)
+        auth = new google.auth.OAuth2(
+          parsedCreds.client_id,
+          parsedCreds.client_secret
+        );
+        auth.setCredentials({
+          refresh_token: parsedCreds.refresh_token
+        });
+      } else if (parsedCreds.client_email && parsedCreds.private_key) {
+        // Service Account (Legacy/Workspace)
+        auth = new google.auth.GoogleAuth({
+          credentials: {
+            client_email: parsedCreds.client_email,
+            private_key: parsedCreds.private_key,
+          },
+          scopes: ['https://www.googleapis.com/auth/drive'],
+        });
+      } else {
+        throw new Error('JSON missing required fields. Expected either OAuth tokens or Service Account keys.');
+      }
 
       const drive = google.drive({ version: 'v3', auth });
       const action = currentNode.data?.action || 'read';
@@ -885,12 +901,28 @@ const executeNode = async (job: Job) => {
         if (!fileId) throw new Error('No File ID provided for reading.');
 
         console.log(`[Queue] Cloud Vault fetching file: ${fileId}`);
-        const res = await drive.files.get({
+        const metaRes = await drive.files.get({
           fileId: fileId,
-          alt: 'media',
+          fields: 'mimeType',
         });
+        const mimeType = metaRes.data.mimeType || '';
 
-        const fileContent = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+        let fileContent = '';
+        if (mimeType.startsWith('application/vnd.google-apps.')) {
+          // Export Google Workspace documents (like Google Docs) to plain text
+          const exportRes = await drive.files.export({
+            fileId: fileId,
+            mimeType: 'text/plain',
+          });
+          fileContent = typeof exportRes.data === 'string' ? exportRes.data : JSON.stringify(exportRes.data);
+        } else {
+          // Download regular binary files (like actual .txt files)
+          const downloadRes = await drive.files.get({
+            fileId: fileId,
+            alt: 'media',
+          });
+          fileContent = typeof downloadRes.data === 'string' ? downloadRes.data : JSON.stringify(downloadRes.data);
+        }
         newContext.lastOutput = fileContent;
         newContext[nodeId] = fileContent;
         console.log(`[Queue] Cloud Vault successfully fetched file.`);
@@ -907,7 +939,7 @@ const executeNode = async (job: Job) => {
 
         const fileMetadata: any = {
           name: fileName,
-          mimeType: 'text/plain',
+          mimeType: 'application/vnd.google-apps.document',
         };
         if (folderId) {
           fileMetadata.parents = [folderId];

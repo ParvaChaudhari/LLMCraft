@@ -109,6 +109,10 @@ export default function SidePanel({
   const [newCredKey, setNewCredKey] = useState('');
   const [isSavingCred, setIsSavingCred] = useState(false);
   const [activeTabs, setActiveTabs] = useState<string[]>(['input', 'tasks', 'logs']);
+  
+  const [gDriveClientId, setGDriveClientId] = useState('');
+  const [gDriveClientSecret, setGDriveClientSecret] = useState('');
+  const [gDriveRefreshToken, setGDriveRefreshToken] = useState('');
 
   const [embeddingCredentials, setEmbeddingCredentials] = useState<any[]>([]);
 
@@ -410,16 +414,26 @@ export default function SidePanel({
   };
 
   const handleCreateCredential = async () => {
-    if (!newCredName || !newCredKey) return;
+    const credType = getCredentialProvider(selectedNode.type);
+    
+    let finalKey = newCredKey;
+    if (credType === 'google_drive') {
+      finalKey = JSON.stringify({
+        client_id: gDriveClientId,
+        client_secret: gDriveClientSecret,
+        refresh_token: gDriveRefreshToken
+      });
+    }
+
+    if (!newCredName || !finalKey) return;
     setIsSavingCred(true);
     try {
-      const credType = getCredentialProvider(selectedNode.type);
       if (!credType) return;
 
       const res = await fetch('/api/credentials', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newCredName, type: credType, apiKey: newCredKey })
+        body: JSON.stringify({ name: newCredName, type: credType, apiKey: finalKey })
       });
       const newCred = await res.json();
 
@@ -429,6 +443,9 @@ export default function SidePanel({
         setShowNewCredForm(false);
         setNewCredName('');
         setNewCredKey('');
+        setGDriveClientId('');
+        setGDriveClientSecret('');
+        setGDriveRefreshToken('');
       }
     } catch (e) {
       console.error(e);
@@ -684,15 +701,35 @@ export default function SidePanel({
                               </div>
                               <div>
                                 <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-inverse-primary)]">
-                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : getCredentialProvider(selectedNode.type) === 'google_drive' ? 'Service Account JSON' : 'API Key'}
+                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : getCredentialProvider(selectedNode.type) === 'google_drive' ? 'OAuth JSON (Client & Token)' : 'API Key'}
                                 </label>
                                 {getCredentialProvider(selectedNode.type) === 'google_drive' ? (
-                                  <textarea
-                                    value={newCredKey}
-                                    onChange={(e) => setNewCredKey(e.target.value)}
-                                    placeholder='{ "type": "service_account", ... }'
-                                    className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] resize-y custom-scrollbar"
-                                  />
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={gDriveClientId}
+                                      onChange={(e) => setGDriveClientId(e.target.value)}
+                                      placeholder="Client ID (e.g. 12345-abcde.apps.googleusercontent.com)"
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                    <input
+                                      type="password"
+                                      value={gDriveClientSecret}
+                                      onChange={(e) => setGDriveClientSecret(e.target.value)}
+                                      placeholder="Client Secret (e.g. GOCSPX-...)"
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                    <input
+                                      type="password"
+                                      value={gDriveRefreshToken}
+                                      onChange={(e) => setGDriveRefreshToken(e.target.value)}
+                                      placeholder="Refresh Token (e.g. 1//0eXYZ...)"
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                  </div>
                                 ) : (
                                   <input
                                     type="password"
@@ -1341,8 +1378,8 @@ export default function SidePanel({
                             onChange={(e) => handleChange('action', e.target.value)}
                             className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
                           >
-                            <option value="read">Read File (.txt)</option>
-                            <option value="create">Create File (.txt)</option>
+                            <option value="read">Read Google Doc / Text</option>
+                            <option value="create">Create Google Doc</option>
                           </select>
                         </div>
                         
