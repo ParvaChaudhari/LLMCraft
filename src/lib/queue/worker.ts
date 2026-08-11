@@ -977,6 +977,10 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
     return; // End of line (output node exits here)
+  } else if (currentNode.type === 'merge') {
+    // Context was already merged by the rendezvous barrier before this job was queued.
+    // lastOutput is already set to { branch_a, branch_b } JSON. Just log and pass through.
+    console.log(`[Queue] Junction Tower: merged output ready → continuing pipeline.`);
   }
   // End of runLogic
   };
@@ -987,7 +991,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {
@@ -1114,6 +1118,49 @@ const executeNode = async (job: Job) => {
     let nextNodeId = edge.target;
     const nextNode = nodes.find((n: any) => n.id === nextNodeId);
     let delay = 0;
+
+    // ── Merge node rendezvous barrier ─────────────────────────────────────────
+    // If the downstream node is a merge node, we must wait for BOTH branches
+    // to arrive before dispatching the merge job. We use Redis as a shared
+    // store: the first branch saves its context and stops; the second branch
+    // reads the first, merges both, clears the key, and finally queues the job.
+    if (nextNode && nextNode.type === 'merge') {
+      const mergeKey = `merge:${workflowId}:${nextNodeId}`;
+      const handle = edge.targetHandle || 'a'; // 'a' (top) or 'b' (bottom)
+
+      // Save this branch's full context
+      await connection.hset(mergeKey, handle, JSON.stringify(newContext));
+      await connection.expire(mergeKey, 3600); // 1-hour TTL safety net
+
+      const storedA = await connection.hget(mergeKey, 'a');
+      const storedB = await connection.hget(mergeKey, 'b');
+
+      if (storedA && storedB) {
+        // Both branches have arrived — merge and dispatch
+        const contextA = JSON.parse(storedA);
+        const contextB = JSON.parse(storedB);
+
+        await connection.del(mergeKey); // Clean up Redis key
+
+        const mergedContext = { ...contextA, ...contextB };
+        mergedContext._mergeA = contextA.lastOutput;
+        mergedContext._mergeB = contextB.lastOutput;
+        mergedContext.lastOutput = JSON.stringify({
+          branch_a: contextA.lastOutput,
+          branch_b: contextB.lastOutput
+        }, null, 2);
+
+        console.log(`[Queue] Junction Tower: both branches arrived — dispatching merge job.`);
+        await broadcastEvent(workflowId, 'EDGE_TRAVERSED', { edgeId: edge.id, source: nodeId, target: nextNodeId });
+        await workflowQueue.add('execute-node', {
+          workflowId, nodeId: nextNodeId, nodes, edges, context: mergedContext
+        });
+      } else {
+        console.log(`[Queue] Junction Tower: branch '${handle}' arrived — waiting for the other branch.`);
+      }
+      continue; // Skip normal dispatch for this edge
+    }
+    // ─────────────────────────────────────────────────────────────────────────
     
     // If next node is a Delay, tell BullMQ to wait before executing it
     if (nextNode && nextNode.type === 'delay') {

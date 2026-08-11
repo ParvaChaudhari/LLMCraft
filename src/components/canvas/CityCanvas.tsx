@@ -52,6 +52,7 @@ import IsometricBackground from './IsometricBackground';
 import ClocktowerNode from './nodes/ClocktowerNode';
 
 import GoogleDriveNode from './nodes/GoogleDriveNode';
+import MergeNode from './nodes/MergeNode';
 
 const nodeTypes = {
   webhook: WebhookNode,
@@ -75,6 +76,7 @@ const nodeTypes = {
   bankVault: BankVaultNode,
   artStudio: ArtStudioNode,
   postOffice: PostOfficeNode,
+  merge: MergeNode,
 };
 
 const edgeTypes = {

@@ -88,6 +88,7 @@ const toolAssets: Record<string, string> = {
   postOffice: 'postoffice.png',
   clocktower: 'clocktower.png',
   googleDrive: 'gdrive_vault.png',
+  merge: 'merge_junction.png',
 };
 
 export default function SidePanel({
@@ -459,7 +460,8 @@ export default function SidePanel({
 
   // Calculate inputs for the 'Input' tab
   const incomingEdges = edges.filter(e => e.target === selectedNode.id);
-  const incomingNodes = incomingEdges.map(e => nodes.find(n => n.id === e.source)).filter(Boolean);
+  const uniqueIncomingIds = Array.from(new Set(incomingEdges.map(e => e.source)));
+  const incomingNodes = uniqueIncomingIds.map(id => nodes.find(n => n.id === id)).filter(Boolean);
 
   const renderInputSource = (node: any) => {
     let outputData = node.data?.output;
@@ -1436,6 +1438,24 @@ export default function SidePanel({
                     {selectedNode.type === 'output' && (
                       <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">
                         <div>END OF LINE</div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'merge' && (
+                      <div className="space-y-4">
+                        <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input space-y-3">
+                          <p className="text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] leading-relaxed">
+                            Connect <span className="text-blue-400 font-bold">Branch A</span> (top handle) and <span className="text-purple-400 font-bold">Branch B</span> (bottom handle) from two separate pipeline paths.
+                          </p>
+                          <p className="text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] leading-relaxed">
+                            The Junction Tower will wait for <span className="text-amber-400 font-bold">both</span> branches to finish, then combine their outputs and continue as one stream.
+                          </p>
+                          <div className="border-t border-[var(--color-on-surface-variant)] pt-3">
+                            <p className="text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-xs uppercase tracking-widest">Output Format</p>
+                            <pre className="text-[var(--color-tertiary-fixed-dim)] font-[family-name:var(--font-code-sm)] text-xs mt-1 whitespace-pre-wrap">{`{\n  "branch_a": "...",\n  "branch_b": "..."\n}`}</pre>
+                            <p className="text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-xs mt-2">Use <span className="text-[var(--color-on-surface)] font-bold">{"{{_mergeA}}"}</span> or <span className="text-[var(--color-on-surface)] font-bold">{"{{_mergeB}}"}</span> in downstream prompts to reference each branch individually.</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
