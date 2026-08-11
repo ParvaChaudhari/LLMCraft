@@ -15,9 +15,10 @@ export default function RoadEdge({
   targetY,
   data,
   selected,
+  sourcePosition,
 }: EdgeProps) {
   // Compute path points (returns GridPoint[])
-  const points = useMemo(() => routeIsometric(sourceX, sourceY, targetX, targetY), [sourceX, sourceY, targetX, targetY]);
+  const points = useMemo(() => routeIsometric(sourceX, sourceY, targetX, targetY, sourcePosition), [sourceX, sourceY, targetX, targetY, sourcePosition]);
   
   // Register with global road store
   useEffect(() => {

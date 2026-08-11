@@ -64,6 +64,7 @@ export function routeIsometric(
   sy: number,
   tx: number,
   ty: number,
+  sourcePosition?: string
 ): GridPoint[] {
   const dx = tx - sx;
   const dy = ty - sy;
@@ -91,20 +92,39 @@ export function routeIsometric(
   const bSign = Math.sign(bSteps) || 1;
   const bAxis = { x: AXIS_B.x * bSign, y: AXIS_B.y * bSign };
 
-  // Walk Axis A
-  for (let i = 0; i <= Math.abs(aSteps); i++) {
-    points.push({ x: curX, y: curY });
-    if (i < Math.abs(aSteps)) {
+  // If the edge comes out of the Top or Bottom handles, we should walk Axis B first!
+  // Top -> UP-RIGHT (-Axis B)
+  // Bottom -> DOWN-LEFT (+Axis B)
+  // Right -> DOWN-RIGHT (+Axis A)
+  // Left -> UP-LEFT (-Axis A)
+  const walkBFirst = sourcePosition === 'top' || sourcePosition === 'bottom';
+
+  if (walkBFirst) {
+    for (let i = 0; i <= Math.abs(bSteps); i++) {
+      points.push({ x: curX, y: curY });
+      if (i < Math.abs(bSteps)) {
+        curX += bAxis.x;
+        curY += bAxis.y;
+      }
+    }
+    for (let i = 1; i <= Math.abs(aSteps); i++) {
       curX += aAxis.x;
       curY += aAxis.y;
+      points.push({ x: curX, y: curY });
     }
-  }
-
-  // Walk Axis B (starting from 1 so we don't duplicate the corner point)
-  for (let i = 1; i <= Math.abs(bSteps); i++) {
-    curX += bAxis.x;
-    curY += bAxis.y;
-    points.push({ x: curX, y: curY });
+  } else {
+    for (let i = 0; i <= Math.abs(aSteps); i++) {
+      points.push({ x: curX, y: curY });
+      if (i < Math.abs(aSteps)) {
+        curX += aAxis.x;
+        curY += aAxis.y;
+      }
+    }
+    for (let i = 1; i <= Math.abs(bSteps); i++) {
+      curX += bAxis.x;
+      curY += bAxis.y;
+      points.push({ x: curX, y: curY });
+    }
   }
 
   return points;

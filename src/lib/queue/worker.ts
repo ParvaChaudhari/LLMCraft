@@ -1060,49 +1060,94 @@ const executeNode = async (job: Job) => {
 
   // 2. Find next nodes based on edges
   const outgoingEdges = edges.filter((e: any) => e.source === nodeId);
-  const validEdges: any[] = [];
+  const validDispatches: { edge: any; edgeContext: any }[] = [];
   
-  let expectedHandle: string | null = null;
   if (currentNode.type === 'conditional') {
     const lhsRaw = currentNode.data?.conditionLhs || '{{lastOutput}}';
     const rhsRaw = currentNode.data?.conditionRhs || 'error';
     const op = currentNode.data?.conditionOperator || 'contains';
     
-    const lhs = replaceVariables(lhsRaw, newContext);
-    const rhs = replaceVariables(rhsRaw, newContext);
-    
-    let condition = false;
-    const lhsStr = String(lhs).toLowerCase();
-    const rhsStr = String(rhs).toLowerCase();
-    
-    switch (op) {
-      case 'contains':
-        condition = lhsStr.includes(rhsStr);
-        break;
-      case 'is_equal_to':
-        condition = lhsStr === rhsStr;
-        break;
-      case 'is_not_equal_to':
-        condition = lhsStr !== rhsStr;
-        break;
-      case 'greater_than':
-        condition = parseFloat(lhsStr) > parseFloat(rhsStr);
-        break;
-      case 'less_than':
-        condition = parseFloat(lhsStr) < parseFloat(rhsStr);
-        break;
-      default:
-        condition = lhsStr.includes(rhsStr);
-    }
-    
-    expectedHandle = condition ? 'true' : 'false';
-  }
+    const evaluateCondition = (contextForEval: any) => {
+      const lhs = replaceVariables(lhsRaw, contextForEval);
+      const rhs = replaceVariables(rhsRaw, contextForEval);
+      const lhsStr = String(lhs).toLowerCase();
+      const rhsStr = String(rhs).toLowerCase();
+      switch (op) {
+        case 'contains': return lhsStr.includes(rhsStr);
+        case 'is_equal_to': return lhsStr === rhsStr;
+        case 'is_not_equal_to': return lhsStr !== rhsStr;
+        case 'greater_than': return parseFloat(lhsStr) > parseFloat(rhsStr);
+        case 'less_than': return parseFloat(lhsStr) < parseFloat(rhsStr);
+        default: return lhsStr.includes(rhsStr);
+      }
+    };
 
-  for (const edge of outgoingEdges) {
-    if (currentNode.type === 'conditional' && edge.sourceHandle !== expectedHandle) {
-      continue;
+    let inputArray: any[] | null = null;
+    try {
+      let raw = (newContext.lastOutput || '').trim();
+      const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+      if (fence) raw = fence[1].trim();
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) inputArray = parsed;
+    } catch (_) {}
+
+    if (inputArray) {
+      console.log(`[Queue] Conditional node processing array of ${inputArray.length} items`);
+      const trueItems: any[] = [];
+      const falseItems: any[] = [];
+      
+      // We will look for keys that hold arrays to properly inject the current item
+      const arrayContextKeys = new Set<string>();
+      for (const key of Object.keys(newContext)) {
+        if (typeof newContext[key] === 'string') {
+          try {
+            let raw = (newContext[key] as string).trim();
+            const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+            if (fence) raw = fence[1].trim();
+            if (Array.isArray(JSON.parse(raw))) arrayContextKeys.add(key);
+          } catch (_) {}
+        }
+      }
+      
+      for (const item of inputArray) {
+        const tempContext = { ...newContext };
+        const itemString = typeof item === 'string' ? item : JSON.stringify(item);
+        for (const key of arrayContextKeys) tempContext[key] = itemString;
+        tempContext.lastOutput = itemString;
+        
+        const condition = evaluateCondition(tempContext);
+        if (condition) trueItems.push(item);
+        else falseItems.push(item);
+      }
+      
+      for (const edge of outgoingEdges) {
+        if (edge.sourceHandle === 'true' && trueItems.length > 0) {
+          const edgeContext = { ...newContext };
+          edgeContext.lastOutput = JSON.stringify(trueItems, null, 2);
+          edgeContext[nodeId] = edgeContext.lastOutput;
+          validDispatches.push({ edge, edgeContext });
+        } else if (edge.sourceHandle === 'false' && falseItems.length > 0) {
+          const edgeContext = { ...newContext };
+          edgeContext.lastOutput = JSON.stringify(falseItems, null, 2);
+          edgeContext[nodeId] = edgeContext.lastOutput;
+          validDispatches.push({ edge, edgeContext });
+        }
+      }
+    } else {
+      // Single Item Mode
+      const condition = evaluateCondition(newContext);
+      const expectedHandle = condition ? 'true' : 'false';
+      
+      for (const edge of outgoingEdges) {
+        if (edge.sourceHandle === expectedHandle) {
+          validDispatches.push({ edge, edgeContext: newContext });
+        }
+      }
     }
-    validEdges.push(edge);
+  } else {
+    for (const edge of outgoingEdges) {
+      validDispatches.push({ edge, edgeContext: newContext });
+    }
   }
 
   // Broadcast completion of current node
@@ -1111,10 +1156,10 @@ const executeNode = async (job: Job) => {
     nodeId, 
     type: currentNode.type, 
     output: newContext.lastOutput,
-    isLastNode: validEdges.length === 0
+    isLastNode: validDispatches.length === 0
   });
   
-  for (const edge of validEdges) {
+  for (const { edge, edgeContext } of validDispatches) {
     let nextNodeId = edge.target;
     const nextNode = nodes.find((n: any) => n.id === nextNodeId);
     let delay = 0;
@@ -1129,7 +1174,7 @@ const executeNode = async (job: Job) => {
       const handle = edge.targetHandle || 'a'; // 'a' (top) or 'b' (bottom)
 
       // Save this branch's full context
-      await connection.hset(mergeKey, handle, JSON.stringify(newContext));
+      await connection.hset(mergeKey, handle, JSON.stringify(edgeContext));
       await connection.expire(mergeKey, 3600); // 1-hour TTL safety net
 
       const storedA = await connection.hget(mergeKey, 'a');
@@ -1179,7 +1224,7 @@ const executeNode = async (job: Job) => {
       nodeId: nextNodeId,
       nodes,
       edges,
-      context: newContext
+      context: edgeContext
     }, { delay });
   }
 };

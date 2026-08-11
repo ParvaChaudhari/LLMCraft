@@ -16,8 +16,8 @@ export default function MergeNode({ id, data, selected }: { id: string, data: an
         <img src="/assets/merge_junction.png" alt="Junction Tower" className="w-full h-full object-contain" />
       </div>
 
-      {/* Single output handle on the right */}
-      <Handle type="source" position={Position.Right} id="merged" className="w-2 h-2 bg-amber-400 border-none rounded-full z-10" style={{ right: 64, top: 46 }} />
+      {/* Single output handle on the right (aligned to Top-Right road) */}
+      <Handle type="source" position={Position.Top} id="merged" className="w-2 h-2 bg-amber-400 border-none rounded-full z-10" style={{ right: 55, left: 'auto', top: 25, transform: 'none' }} />
     </div>
   );
 }
