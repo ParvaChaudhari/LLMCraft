@@ -973,6 +973,18 @@ const executeNode = async (job: Job) => {
     newContext.lastOutput = result;
     newContext[nodeId] = result;
     console.log(`[Queue] Clocktower triggered: ${result}`);
+  } else if (currentNode.type === 'variable') {
+    const vars = currentNode.data?.variables || [];
+    const outputObj: Record<string, any> = {};
+    for (const v of vars) {
+      if (v.key) {
+        outputObj[v.key] = replaceVariables(v.value || '', newContext);
+      }
+    }
+    const resultJson = JSON.stringify(outputObj, null, 2);
+    newContext.lastOutput = resultJson;
+    newContext[nodeId] = resultJson;
+    console.log(`[Queue] Storage Shed extracted ${Object.keys(outputObj).length} variables.`);
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });

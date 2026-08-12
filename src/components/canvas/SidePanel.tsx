@@ -89,6 +89,7 @@ const toolAssets: Record<string, string> = {
   clocktower: 'clocktower.png',
   googleDrive: 'gdrive_vault.png',
   merge: 'merge_junction.png',
+  variable: 'storage_shed.png',
 };
 
 export default function SidePanel({
@@ -561,7 +562,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -1438,6 +1439,62 @@ export default function SidePanel({
                     {selectedNode.type === 'output' && (
                       <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] tracking-widest uppercase">
                         <div>END OF LINE</div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'variable' && (
+                      <div className="space-y-4">
+                        <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input">
+                          <p className="text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-xs mb-3">
+                            Define variables to reshape data or set static values. Use <span className="text-[var(--color-on-surface)] font-bold">{"{{lastOutput.field}}"}</span> to extract data.
+                          </p>
+                          {(data.variables || []).map((v: any, index: number) => (
+                            <div key={index} className="flex space-x-2 items-start mb-2">
+                              <input
+                                type="text"
+                                value={v.key || ''}
+                                onChange={(e) => {
+                                  const newVars = [...(data.variables || [])];
+                                  newVars[index].key = e.target.value;
+                                  handleChange('variables', newVars);
+                                }}
+                                className="w-1/3 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Key"
+                              />
+                              <input
+                                type="text"
+                                value={v.value || ''}
+                                onChange={(e) => {
+                                  const newVars = [...(data.variables || [])];
+                                  newVars[index].value = e.target.value;
+                                  handleChange('variables', newVars);
+                                }}
+                                className="flex-1 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="{{lastOutput.name}}"
+                              />
+                              <button
+                                onClick={() => {
+                                  const newVars = [...(data.variables || [])];
+                                  newVars.splice(index, 1);
+                                  handleChange('variables', newVars);
+                                }}
+                                className="text-red-500 hover:text-red-400 font-bold px-2 py-1"
+                                title="Remove"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                          <button
+                            onClick={() => {
+                              const newVars = [...(data.variables || []), { key: '', value: '' }];
+                              handleChange('variables', newVars);
+                            }}
+                            className="w-full bg-blue-500 hover:bg-blue-400 text-white py-1 font-bold tactile-button uppercase tracking-wider text-sm mt-2 transition-colors"
+                          >
+                            + Add Variable
+                          </button>
+                        </div>
                       </div>
                     )}
 

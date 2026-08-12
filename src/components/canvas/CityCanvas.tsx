@@ -53,11 +53,14 @@ import ClocktowerNode from './nodes/ClocktowerNode';
 
 import GoogleDriveNode from './nodes/GoogleDriveNode';
 import MergeNode from './nodes/MergeNode';
+import VariableNode from './nodes/VariableNode';
 
 const nodeTypes = {
   webhook: WebhookNode,
   clocktower: ClocktowerNode,
   googleDrive: GoogleDriveNode,
+  merge: MergeNode,
+  variable: VariableNode,
   geminiFactory: GeminiFactoryNode,
   chatgptFactory: ChatGPTFactoryNode,
   claudeFactory: ClaudeFactoryNode,
