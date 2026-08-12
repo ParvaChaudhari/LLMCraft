@@ -112,6 +112,19 @@ export default function SidePanel({
   const [isSavingCred, setIsSavingCred] = useState(false);
   const [activeTabs, setActiveTabs] = useState<string[]>(['input', 'tasks', 'logs']);
   
+  const lastFocusedInputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        lastFocusedInputRef.current = target as HTMLInputElement | HTMLTextAreaElement;
+      }
+    };
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+  
   const [gDriveClientId, setGDriveClientId] = useState('');
   const [gDriveClientSecret, setGDriveClientSecret] = useState('');
   const [gDriveRefreshToken, setGDriveRefreshToken] = useState('');
@@ -399,6 +412,33 @@ export default function SidePanel({
 
   const handleInsertVariable = (path: string) => {
     const templateTag = `{{${path}}}`;
+    
+    const activeEl = lastFocusedInputRef.current;
+    if (activeEl && document.contains(activeEl)) {
+      const start = activeEl.selectionStart || 0;
+      const end = activeEl.selectionEnd || 0;
+      const text = activeEl.value;
+      const before = text.substring(0, start);
+      const after = text.substring(end);
+      
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+      const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      
+      if (activeEl.tagName === 'INPUT' && nativeInputValueSetter) {
+        nativeInputValueSetter.call(activeEl, before + templateTag + after);
+      } else if (activeEl.tagName === 'TEXTAREA' && nativeTextAreaValueSetter) {
+        nativeTextAreaValueSetter.call(activeEl, before + templateTag + after);
+      }
+
+      activeEl.dispatchEvent(new Event('input', { bubbles: true }));
+      
+      setTimeout(() => {
+        activeEl.focus();
+        activeEl.setSelectionRange(start + templateTag.length, start + templateTag.length);
+      }, 0);
+      return;
+    }
+
     if (LLM_NODE_TYPES.includes(selectedNode.type) || selectedNode.type === 'artStudio' || selectedNode.type === 'postOffice') {
       const currentPrompt = selectedNode.data?.prompt || selectedNode.data?.message || '';
       const field = selectedNode.type === 'postOffice' ? 'message' : 'prompt';
@@ -487,7 +527,7 @@ export default function SidePanel({
               key={k}
               keyName={k}
               value={v}
-              path={`${node.id}.${k}`}
+              path={Array.isArray(parsedJson) ? 'lastOutput' : `lastOutput.${k}`}
               onInsert={handleInsertVariable}
             />
           ))}
@@ -1558,7 +1598,7 @@ export default function SidePanel({
                             // Invalid JSON
                           }
 
-                          if (parsedJson && typeof parsedJson === 'object') {
+                          if (parsedJson !== null && typeof parsedJson === 'object') {
                             return (
                               <div className="bg-transparent font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] flex-1 overflow-y-auto pr-2 custom-scrollbar">
                                 {Object.entries(parsedJson).map(([k, v]) => (
@@ -1566,7 +1606,8 @@ export default function SidePanel({
                                     key={k}
                                     keyName={k}
                                     value={v}
-                                    path={k}
+                                    path={Array.isArray(parsedJson) ? 'lastOutput' : `lastOutput.${k}`}
+                                    onInsert={handleInsertVariable}
                                   />
                                 ))}
                               </div>
