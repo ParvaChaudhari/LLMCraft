@@ -90,6 +90,7 @@ const toolAssets: Record<string, string> = {
   googleDrive: 'gdrive_vault.png',
   merge: 'merge_junction.png',
   variable: 'storage_shed.png',
+  airport: 'airport.png',
 };
 
 export default function SidePanel({
@@ -139,6 +140,34 @@ export default function SidePanel({
   const [terminalLogs, setTerminalLogs] = useState<{time: string, text: string, type: string}[]>([]);
   const nodeEventSourceRef = useRef<EventSource | null>(null);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
+  const [savedWorkflows, setSavedWorkflows] = useState<{id: string, name: string}[]>([]);
+
+  useEffect(() => {
+    if (selectedNode?.type === 'airport') {
+      const fetchWorkflows = async () => {
+        try {
+          const { createClient } = await import('@/lib/supabase/client');
+          const supabase = createClient();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { data } = await supabase
+            .from('workflows')
+            .select('id, name, graph_json')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+            
+          if (data) {
+            const currentCityId = typeof window !== 'undefined' ? window.location.pathname.split('/').pop() : '';
+            setSavedWorkflows(data.filter((wf: any) => wf.id !== currentCityId));
+          }
+        } catch (e) {
+          console.error("Failed to fetch workflows:", e);
+        }
+      };
+      fetchWorkflows();
+    }
+  }, [selectedNode?.type]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -602,7 +631,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -953,6 +982,35 @@ export default function SidePanel({
                             className="w-full h-40 p-3 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] inset-input resize-y outline-none"
                             placeholder='{&#10;  "searchTerms": ["{{lastOutput}}"]&#10;}'
                           />
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'airport' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Target Workflow (Sub-Agent)</label>
+                          <select
+                            value={data.workflowId || ''}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              const wf = savedWorkflows.find((w: any) => w.id === id);
+                              updateNodeData(selectedNode.id, {
+                                ...data,
+                                workflowId: id,
+                                workflowGraph: wf ? wf.graph_json : null
+                              });
+                            }}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="">-- Select Saved Workflow --</option>
+                            {savedWorkflows.map(wf => (
+                              <option key={wf.id} value={wf.id}>{wf.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]">
+                          The current data in this pipeline (lastOutput) will be passed directly into the selected sub-workflow's starting node. This node will pause execution and wait for the sub-workflow to finish.
                         </div>
                       </div>
                     )}

@@ -34,6 +34,7 @@ const toolItems: ToolItem[] = [
   { type: 'bankVault',      name: 'Supabase Center',  icon: 'account_balance', description: 'Supabase Vector DB',         longDescription: 'Connect to Supabase to store and retrieve semantic embeddings for RAG workflows.', color: '#4af626', asset: 'bank-vault.png' },
   { type: 'artStudio',      name: 'Art Studio',       icon: 'palette', description: 'Image Generation',         longDescription: 'Generate images using DALL-E, Imagen 4, or Nano Banana Pro based on dynamic prompts.', color: '#facc15', asset: 'art_studio.png' },
   { type: 'postOffice',     name: 'Post Office',      icon: 'mark_email_unread', description: 'Dispatch Notifications',     longDescription: 'Send outputs via email, Slack, Discord, or other webhooks to notify users.', color: '#0ea5e9', asset: 'postoffice.png' },
+  { type: 'airport',        name: 'Agent Runway',     icon: 'flight_takeoff', description: 'Invoke Sub-Workflow',        longDescription: 'Invoke another saved workflow as a sub-agent. Suspends execution until the sub-agent returns its final output.', color: '#ef4444', asset: 'airport.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

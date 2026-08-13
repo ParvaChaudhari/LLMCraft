@@ -989,6 +989,80 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
     await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
     return; // End of line (output node exits here)
+  } else if (currentNode.type === 'airport') {
+    const targetWorkflowId = currentNode.data?.workflowId;
+    if (!targetWorkflowId) {
+      newContext.lastOutput = 'Error (Agent Runway): No target workflow selected.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      console.log(`[Queue] Agent Runway dispatching sub-workflow: ${targetWorkflowId}`);
+      try {
+        const wfGraph = currentNode.data?.workflowGraph;
+        if (!wfGraph) throw new Error("Sub-workflow graph missing. RLS issue or unconfigured node?");
+
+        const subNodes = wfGraph.nodes || [];
+        const subEdges = wfGraph.edges || [];
+        
+        // Find starting node (webhook or any node with no incoming edges)
+        const startNode = subNodes.find((n: any) => n.type === 'webhook') || subNodes.find((n:any) => !subEdges.some((e:any) => e.target === n.id));
+        if (!startNode) throw new Error("Sub-workflow has no starting node.");
+
+        const subWorkflowExecId = `sub-exec-${Date.now()}-${Math.floor(Math.random()*1000)}`;
+        
+        // Wait for sub-workflow to complete using a dedicated Redis subscriber
+        const subResult = await new Promise((resolve, reject) => {
+          const subscriber = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379');
+          const channel = `workflow-events:${subWorkflowExecId}`;
+          
+          const timeoutId = setTimeout(() => {
+            subscriber.quit();
+            reject(new Error("Sub-workflow timed out after 60 seconds."));
+          }, 60000);
+
+          let isDone = false;
+          
+          subscriber.on('error', () => {}); // Ignore connection drop errors after resolving
+
+          subscriber.subscribe(channel, (err) => {
+            if (err && !isDone) {
+              isDone = true;
+              clearTimeout(timeoutId);
+              subscriber.disconnect();
+              reject(err);
+            }
+          });
+
+          subscriber.on('message', (ch, message) => {
+            if (ch === channel && !isDone) {
+              const payload = JSON.parse(message);
+              if (payload.event === 'NODE_FINISHED' && (payload.data.isLastNode || payload.data.type === 'output')) {
+                isDone = true;
+                clearTimeout(timeoutId);
+                subscriber.disconnect();
+                resolve(payload.data.output);
+              }
+            }
+          });
+
+          // Kick off the sub-workflow, passing the current lastOutput into its starting context
+          workflowQueue.add('execute-node', {
+            workflowId: subWorkflowExecId,
+            nodeId: startNode.id,
+            nodes: subNodes,
+            edges: subEdges,
+            context: { lastOutput: newContext.lastOutput }
+          });
+        });
+
+        newContext.lastOutput = String(subResult);
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Agent Runway received sub-workflow output successfully.`);
+      } catch (err: any) {
+        console.error(`[Queue] Agent Runway Error:`, err.message);
+        newContext.lastOutput = `Error (Agent Runway): ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'merge') {
     // Context was already merged by the rendezvous barrier before this job was queued.
     // lastOutput is already set to { branch_a, branch_b } JSON. Just log and pass through.

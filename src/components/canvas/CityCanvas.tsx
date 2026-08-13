@@ -50,10 +50,10 @@ import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
 import ClocktowerNode from './nodes/ClocktowerNode';
-
 import GoogleDriveNode from './nodes/GoogleDriveNode';
 import MergeNode from './nodes/MergeNode';
 import VariableNode from './nodes/VariableNode';
+import AirportNode from './nodes/AirportNode';
 
 const nodeTypes = {
   webhook: WebhookNode,
@@ -79,7 +79,7 @@ const nodeTypes = {
   bankVault: BankVaultNode,
   artStudio: ArtStudioNode,
   postOffice: PostOfficeNode,
-  merge: MergeNode,
+  airport: AirportNode,
 };
 
 const edgeTypes = {
