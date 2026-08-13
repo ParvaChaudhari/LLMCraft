@@ -140,7 +140,7 @@ export default function SidePanel({
   const [terminalLogs, setTerminalLogs] = useState<{time: string, text: string, type: string}[]>([]);
   const nodeEventSourceRef = useRef<EventSource | null>(null);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
-  const [savedWorkflows, setSavedWorkflows] = useState<{id: string, name: string}[]>([]);
+  const [savedWorkflows, setSavedWorkflows] = useState<{id: string, name: string, graph_json?: any}[]>([]);
 
   useEffect(() => {
     if (selectedNode?.type === 'airport') {
