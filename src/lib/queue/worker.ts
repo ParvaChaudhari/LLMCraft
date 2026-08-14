@@ -17,7 +17,7 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 export const workflowQueue = new Queue('workflow-queue', { connection: connection as any });
 
 // Helper to broadcast events via Redis Pub/Sub
-const broadcastEvent = async (workflowId: string, event: string, data: any) => {
+export const broadcastEvent = async (workflowId: string, event: string, data: any) => {
   try {
     await connection.publish(`workflow-events:${workflowId}`, JSON.stringify({ event, data }));
   } catch (err) {
@@ -1067,7 +1067,34 @@ const executeNode = async (job: Job) => {
     // Context was already merged by the rendezvous barrier before this job was queued.
     // lastOutput is already set to { branch_a, branch_b } JSON. Just log and pass through.
     console.log(`[Queue] Junction Tower: merged output ready → continuing pipeline.`);
+  } else if (currentNode.type === 'checkpoint') {
+    console.log(`[Queue] Hit Checkpoint node. Pausing execution...`);
+    const supabase = createClient();
+    const promptMessage = currentNode.data?.promptMessage || 'Approval Required';
+    const requireInput = currentNode.data?.requireInput || false;
+    
+    const { error } = await supabase.from('pending_approvals').insert({
+      workflow_id: workflowId,
+      node_id: nodeId,
+      context: newContext,
+      nodes_json: nodes,
+      edges_json: edges,
+      status: 'pending',
+      prompt_message: promptMessage,
+      require_input: requireInput
+    });
+
+    if (error) {
+      console.error("[Queue] Error saving pending approval:", error);
+      newContext.lastOutput = `Error (Checkpoint): ${error.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      // Broadcast that this node is paused
+      await broadcastEvent(workflowId, 'NODE_PAUSED', { nodeId, type: currentNode.type });
+      return false; // 🛑 HALT EXECUTION HERE
+    }
   }
+  return true;
   // End of runLogic
   };
 
@@ -1077,7 +1104,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {
@@ -1119,7 +1146,8 @@ const executeNode = async (job: Job) => {
         }
         newContext.lastOutput = itemString;
 
-        await runLogic();
+        const shouldContinue = await runLogic();
+        if (!shouldContinue) return;
 
         let rawOutput = newContext.lastOutput ?? '';
         const match = rawOutput.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
@@ -1137,11 +1165,13 @@ const executeNode = async (job: Job) => {
       newContext[nodeId] = newContext.lastOutput;
     } else {
       // Single item — normal execution
-      await runLogic();
+      const shouldContinue = await runLogic();
+      if (!shouldContinue) return;
     }
   } else {
     // Exempt node — always runs once
-    await runLogic();
+    const shouldContinue = await runLogic();
+    if (!shouldContinue) return;
   }
 
   // 2. Find next nodes based on edges

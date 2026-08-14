@@ -91,6 +91,7 @@ const toolAssets: Record<string, string> = {
   merge: 'merge_junction.png',
   variable: 'storage_shed.png',
   airport: 'airport.png',
+  checkpoint: 'checkpoint.png',
 };
 
 export default function SidePanel({
@@ -1012,6 +1013,30 @@ export default function SidePanel({
                         <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]">
                           The current data in this pipeline (lastOutput) will be passed directly into the selected sub-workflow's starting node. This node will pause execution and wait for the sub-workflow to finish.
                         </div>
+                      </div>
+                    )}
+                    {selectedNode.type === 'checkpoint' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Approval Prompt Message</label>
+                          <textarea
+                            value={data.promptMessage || ''}
+                            onChange={(e) => handleChange('promptMessage', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-2 px-3 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] min-h-[80px]"
+                            placeholder="e.g. Please review the following content: {{lastOutput}}"
+                          />
+                        </div>
+                        <label className="flex items-center gap-3 cursor-pointer p-3 bg-[var(--color-surface)] inset-input">
+                          <input
+                            type="checkbox"
+                            checked={data.requireInput || false}
+                            onChange={(e) => handleChange('requireInput', e.target.checked)}
+                            className="w-5 h-5 accent-[#06b6d4] bg-transparent border-2 border-[var(--color-on-surface-variant)] cursor-pointer"
+                          />
+                          <span className="font-[family-name:var(--font-code-sm)] font-bold text-[length:var(--text-code-sm)] text-[var(--color-on-surface)]">
+                            Require Human Text Input
+                          </span>
+                        </label>
                       </div>
                     )}
 

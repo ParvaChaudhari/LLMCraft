@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent, useCall
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import IsometricCompound from './IsometricCompound';
+import ApprovalsModal from './ApprovalsModal';
 
 export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<any[]>([]);
@@ -21,6 +22,9 @@ export default function DashboardPage() {
   const [isRunning, setIsRunning] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
+
+  const [showInbox, setShowInbox] = useState(false);
+  const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
 
   // Pan and Zoom state for custom canvas
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -137,6 +141,70 @@ export default function DashboardPage() {
     setIsSavingName(false);
   };
 
+  const startEventStream = (wfId: string, nodes: any[]) => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+    }
+    
+    setIsRunning(true);
+    const eventSource = new EventSource(`/api/events?workflowId=${wfId}`);
+    eventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        const { event: eventName, data: eventData } = payload;
+        
+        if (eventName === 'NODE_STARTED') {
+          const node = nodes.find((n: any) => n.id === eventData.nodeId);
+          setLogs(prev => [...prev, `> Executing ${node?.name || node?.type || 'node'}...`]);
+        } 
+        else if (eventName === 'NODE_FINISHED') {
+          const node = nodes.find((n: any) => n.id === eventData.nodeId);
+          setLogs(prev => [...prev, `> Finished ${node?.name || node?.type || 'node'}.`]);
+          
+          if (eventData.type === 'output') {
+            setLogs(prev => [...prev, `> Output:`]);
+            setLogs(prev => [...prev, eventData.output !== undefined ? JSON.stringify(eventData.output, null, 2) : 'undefined']);
+            
+            setLogs(prev => [...prev, `> Execution complete.`]);
+            setIsRunning(false);
+            eventSource.close();
+          } else if (eventData.isLastNode) {
+            setLogs(prev => [...prev, `> Execution complete.`]);
+            setIsRunning(false);
+            eventSource.close();
+          }
+        }
+        else if (eventName === 'NODE_ERROR') {
+           setLogs(prev => [...prev, `> ERROR: ${eventData.error}`]);
+           setIsRunning(false);
+           eventSource.close();
+        }
+        else if (eventName === 'NODE_PAUSED') {
+           setLogs(prev => [...prev, `> Workflow paused at Checkpoint.`]);
+           setIsRunning(false);
+           eventSource.close();
+           
+           // Refresh pending approvals automatically
+           supabase
+             .from('pending_approvals')
+             .select('*')
+             .eq('status', 'pending')
+             .order('created_at', { ascending: false })
+             .then(({ data }) => {
+               if (data) setPendingApprovals(data);
+             });
+        }
+      } catch(e) {}
+    };
+
+    eventSource.onerror = () => {
+      setIsRunning(false);
+      eventSource.close();
+    };
+  };
+
   const handleRun = async () => {
     if (isRunning || !selectedWorkflow) return;
 
@@ -149,11 +217,6 @@ export default function DashboardPage() {
       return;
     }
 
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-    
-    setIsRunning(true);
     setLogs([
       `> System initialized.`,
       `> Found ${nodes.length} structures.`,
@@ -179,48 +242,7 @@ export default function DashboardPage() {
       if (!res.ok) throw new Error(resData.error || 'Execution failed');
       if (!resData.workflowId) throw new Error('No workflowId returned');
 
-      const eventSource = new EventSource(`/api/events?workflowId=${resData.workflowId}`);
-      eventSourceRef.current = eventSource;
-
-      eventSource.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          const { event: eventName, data: eventData } = payload;
-          
-          if (eventName === 'NODE_STARTED') {
-            const node = nodes.find((n: any) => n.id === eventData.nodeId);
-            setLogs(prev => [...prev, `> Executing ${node?.name || node?.type || 'node'}...`]);
-          } 
-          else if (eventName === 'NODE_FINISHED') {
-            const node = nodes.find((n: any) => n.id === eventData.nodeId);
-            setLogs(prev => [...prev, `> Finished ${node?.name || node?.type || 'node'}.`]);
-            
-            if (eventData.type === 'output') {
-              setLogs(prev => [...prev, `> Output:`]);
-              setLogs(prev => [...prev, JSON.stringify(eventData.output, null, 2)]);
-              
-              setLogs(prev => [...prev, `> Execution complete.`]);
-              setIsRunning(false);
-              eventSource.close();
-            } else if (eventData.isLastNode) {
-              setLogs(prev => [...prev, `> Execution complete.`]);
-              setIsRunning(false);
-              eventSource.close();
-            }
-          }
-
-          else if (eventName === 'NODE_ERROR') {
-             setLogs(prev => [...prev, `> ERROR: ${eventData.error}`]);
-             setIsRunning(false);
-             eventSource.close();
-          }
-        } catch(e) {}
-      };
-
-      eventSource.onerror = () => {
-        setIsRunning(false);
-        eventSource.close();
-      };
+      startEventStream(resData.workflowId, nodes);
 
     } catch (err: any) {
       setLogs(prev => [...prev, `> ERROR: ${err.message}`]);
@@ -271,6 +293,14 @@ export default function DashboardPage() {
         .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
+      
+      const { data: approvalsData } = await supabase
+        .from('pending_approvals')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+      if (approvalsData) setPendingApprovals(approvalsData);
+
       if (data) {
         const positions = new Set();
         // Dynamically scale cluster size based on number of cities to keep them tight
@@ -370,8 +400,35 @@ export default function DashboardPage() {
           </span>
         </div>
 
-        {/* Right: New Sector + Logout */}
+        {/* Right: Inbox + New Sector + Logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={async () => {
+            const { data } = await supabase.from('pending_approvals').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+            if (data) setPendingApprovals(data);
+            setShowInbox(true);
+          }} style={{
+            background: pendingApprovals.length > 0 ? '#ffb4ab' : '#d1c5ae',
+            color: '#1d1b1a',
+            border: '2px solid #1d1b1a',
+            padding: '8px 16px',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            cursor: 'pointer',
+            boxShadow: '2px 2px 0 #1d1b1a',
+            transition: 'all 0.1s',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6
+          }}
+            onMouseDown={e => (e.currentTarget.style.transform = 'translate(2px,2px)', e.currentTarget.style.boxShadow = 'none')}
+            onMouseUp={e => (e.currentTarget.style.transform = '', e.currentTarget.style.boxShadow = '2px 2px 0 #1d1b1a')}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>inbox</span>
+            INBOX ({pendingApprovals.length})
+          </button>
+
           <button onClick={() => setShowNewSectorModal(true)} style={{
             background: '#23ff47',
             color: '#002203',
@@ -678,6 +735,41 @@ export default function DashboardPage() {
       `}</style>
 
       {/* New Sector Modal */}
+      {/* Modals */}
+      {showInbox && (
+        <ApprovalsModal
+          approvals={pendingApprovals}
+          onClose={() => setShowInbox(false)}
+          onApproveReject={async (id, action, input) => {
+            try {
+              const app = pendingApprovals.find(a => a.id === id);
+              
+              // Start listening BEFORE the API call so we don't miss any broadcasts
+              if (app && selectedWorkflow) {
+                setLogs(prev => [...prev, `> Decision: ${action.toUpperCase()} — resuming workflow...`]);
+                startEventStream(app.workflow_id, selectedWorkflow.graph_json?.nodes || []);
+              }
+
+              // Close inbox immediately
+              setPendingApprovals(prev => prev.filter(a => a.id !== id));
+              if (pendingApprovals.length <= 1) setShowInbox(false);
+
+              const res = await fetch('/api/approvals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, action, input }),
+              });
+              if (!res.ok) {
+                const err = await res.json();
+                alert(`Error: ${err.error}`);
+              }
+            } catch (err: any) {
+              alert(`Failed to submit: ${err.message}`);
+            }
+          }}
+        />
+      )}
+
       {showNewSectorModal && (
         <div className="fixed inset-0 bg-[var(--color-on-surface)]/80 backdrop-blur-sm flex items-center justify-center z-[100]">
           <form onSubmit={handleCreateSector} className="w-[400px] bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative z-10">

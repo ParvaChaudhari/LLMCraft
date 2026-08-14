@@ -35,6 +35,7 @@ const toolItems: ToolItem[] = [
   { type: 'artStudio',      name: 'Art Studio',       icon: 'palette', description: 'Image Generation',         longDescription: 'Generate images using DALL-E, Imagen 4, or Nano Banana Pro based on dynamic prompts.', color: '#facc15', asset: 'art_studio.png' },
   { type: 'postOffice',     name: 'Post Office',      icon: 'mark_email_unread', description: 'Dispatch Notifications',     longDescription: 'Send outputs via email, Slack, Discord, or other webhooks to notify users.', color: '#0ea5e9', asset: 'postoffice.png' },
   { type: 'airport',        name: 'Agent Runway',     icon: 'flight_takeoff', description: 'Invoke Sub-Workflow',        longDescription: 'Invoke another saved workflow as a sub-agent. Suspends execution until the sub-agent returns its final output.', color: '#ef4444', asset: 'airport.png' },
+  { type: 'checkpoint',     name: 'Checkpoint',       icon: 'pan_tool', description: 'Human in the Loop',        longDescription: 'Pause the workflow and wait for manual human approval before continuing. You can approve or reject the payload.', color: '#eab308', asset: 'checkpoint.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

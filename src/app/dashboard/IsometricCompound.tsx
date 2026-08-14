@@ -72,6 +72,12 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
     output:          'output_dock.png',
     delay:           'delay_stop.png',
     webhook:         'webhook_tower.png',
+    checkpoint:      'checkpoint.png',
+    airport:         'airport.png',
+    clocktower:      'clocktower.png',
+    googleDrive:     'gdrive_vault.png',
+    variable:        'storage_shed.png',
+    postOffice:      'postoffice.png',
     // Generic/utility nodes intentionally excluded:
     //   conditional, limitToll
   };

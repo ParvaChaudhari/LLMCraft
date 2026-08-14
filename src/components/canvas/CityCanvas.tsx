@@ -43,6 +43,10 @@ import ApifyNode from './nodes/ApifyNode';
 import BankVaultNode from './nodes/BankVaultNode';
 import ArtStudioNode from './nodes/ArtStudioNode';
 import PostOfficeNode from './nodes/PostOfficeNode';
+import GoogleDriveNode from './nodes/GoogleDriveNode';
+import VariableNode from './nodes/VariableNode';
+import AirportNode from './nodes/AirportNode';
+import CheckpointNode from './nodes/CheckpointNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -50,10 +54,7 @@ import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
 import ClocktowerNode from './nodes/ClocktowerNode';
-import GoogleDriveNode from './nodes/GoogleDriveNode';
 import MergeNode from './nodes/MergeNode';
-import VariableNode from './nodes/VariableNode';
-import AirportNode from './nodes/AirportNode';
 
 const nodeTypes = {
   webhook: WebhookNode,
@@ -80,6 +81,7 @@ const nodeTypes = {
   artStudio: ArtStudioNode,
   postOffice: PostOfficeNode,
   airport: AirportNode,
+  checkpoint: CheckpointNode,
 };
 
 const edgeTypes = {
