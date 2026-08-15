@@ -7,6 +7,21 @@ import * as cheerio from 'cheerio';
 import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
+import { Pool } from 'pg';
+// pdf-parse must be required (not imported) to avoid its test-file side-effects at startup
+const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (buf: Buffer) => Promise<{ text: string }>;
+
+// ── Postgres Connection Pool Registry ────────────────────────────────────────
+// Instead of opening a new TCP connection per node execution, we keep a pool
+// per connection string and reuse it across calls. Pools are created lazily.
+const pgPools = new Map<string, Pool>();
+const getPgPool = (connectionString: string): Pool => {
+  if (!pgPools.has(connectionString)) {
+    pgPools.set(connectionString, new Pool({ connectionString, max: 5 }));
+  }
+  return pgPools.get(connectionString)!;
+};
+// ─────────────────────────────────────────────────────────────────────────────
 
 // Initialize Redis connection
 const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
@@ -440,7 +455,6 @@ const executeNode = async (job: Job) => {
         let extractedText = '';
         
         if (ext === '.pdf') {
-          const pdfParse = require('pdf-parse/lib/pdf-parse.js');
           const pdfData = await pdfParse(dataBuffer);
           extractedText = pdfData.text;
         } else if (ext === '.txt' || ext === '.csv') {
@@ -482,14 +496,10 @@ const executeNode = async (job: Job) => {
         
         const interpolatedQuery = replaceVariables(rawQuery, newContext);
         
-        console.log(`[Queue] DB Silo connecting and executing: ${interpolatedQuery.substring(0, 50)}...`);
+        console.log(`[Queue] DB Silo executing: ${interpolatedQuery.substring(0, 50)}...`);
         
-        const { Client } = require('pg');
-        const client = new Client({ connectionString });
-        await client.connect();
-        
-        const res = await client.query(interpolatedQuery);
-        await client.end();
+        const pool = getPgPool(connectionString);
+        const res = await pool.query(interpolatedQuery);
         
         const resultString = JSON.stringify(res.rows, null, 2);
         
@@ -660,10 +670,8 @@ const executeNode = async (job: Job) => {
           embeddingVector = data.data[0].embedding;
         }
 
-        // Connect to Postgres
-        const { Client } = require('pg');
-        const client = new Client({ connectionString: dbConnectionString });
-        await client.connect();
+        // Connect to Postgres via pool
+        const pool = getPgPool(dbConnectionString);
         
         const table = tableName || 'documents';
         
@@ -671,18 +679,17 @@ const executeNode = async (job: Job) => {
           const limit = matchCount || 3;
           // Using <-> (L2 distance / Euclidean) which is standard for pgvector
           const query = `SELECT content FROM ${table} ORDER BY embedding <-> $1 LIMIT $2`;
-          const res = await client.query(query, [`[${embeddingVector.join(',')}]`, limit]);
+          const res = await pool.query(query, [`[${embeddingVector.join(',')}]`, limit]);
           const resultString = JSON.stringify(res.rows, null, 2);
           newContext.lastOutput = resultString;
           newContext[nodeId] = resultString;
         } else {
           const query = `INSERT INTO ${table} (content, embedding) VALUES ($1, $2)`;
-          await client.query(query, [input, `[${embeddingVector.join(',')}]`]);
+          await pool.query(query, [input, `[${embeddingVector.join(',')}]`]);
           newContext.lastOutput = `Successfully saved 1 document to ${table}.`;
           newContext[nodeId] = newContext.lastOutput;
         }
         
-        await client.end();
         console.log(`[Queue] Bank Vault operation complete.`);
       } catch (err: any) {
         console.error(`[Queue] Bank Vault Error:`, err.message);
