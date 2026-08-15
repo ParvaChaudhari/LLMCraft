@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { workflowQueue, broadcastEvent } from '@/lib/queue/worker';
 import { createClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 
 export async function POST(req: NextRequest) {
   try {
@@ -9,6 +11,19 @@ export async function POST(req: NextRequest) {
     if (!id || !['approved', 'rejected'].includes(action)) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
+
+    // ── Auth check: reject unauthenticated requests ───────────────────────────
+    const cookieStore = await cookies();
+    const authClient = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      { cookies: { getAll: () => cookieStore.getAll() } }
+    );
+    const { data: { user } } = await authClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

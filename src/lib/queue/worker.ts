@@ -1,7 +1,7 @@
 import { Queue, Worker, Job } from 'bullmq';
 import IORedis from 'ioredis';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { decrypt } from '@/lib/crypto';
 import * as cheerio from 'cheerio';
 import fs from 'fs';
@@ -15,6 +15,13 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 
 // Create the Queue
 export const workflowQueue = new Queue('workflow-queue', { connection: connection as any });
+
+// Server-side Supabase client — intentionally NOT the browser client
+// The worker runs in Node.js with no user session; anon key is correct here.
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 // Helper to broadcast events via Redis Pub/Sub
 export const broadcastEvent = async (workflowId: string, event: string, data: any) => {
@@ -76,7 +83,6 @@ const fetchApiKey = async (credentialId: string): Promise<string | null> => {
   if (!credentialId) return null;
   
   try {
-    const supabase = createClient();
     const { data, error } = await supabase.from('credentials').select('encrypted_data').eq('id', credentialId).single();
     if (error || !data) return null;
     return decrypt(data.encrypted_data);
@@ -1069,7 +1075,6 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Junction Tower: merged output ready → continuing pipeline.`);
   } else if (currentNode.type === 'checkpoint') {
     console.log(`[Queue] Hit Checkpoint node. Pausing execution...`);
-    const supabase = createClient();
     const promptMessage = currentNode.data?.promptMessage || 'Approval Required';
     const requireInput = currentNode.data?.requireInput || false;
     
