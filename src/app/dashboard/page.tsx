@@ -141,7 +141,7 @@ export default function DashboardPage() {
     setIsSavingName(false);
   };
 
-  const startEventStream = (wfId: string, nodes: any[]) => {
+  const startEventStream = useCallback((wfId: string, nodes: any[]) => {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
@@ -203,7 +203,9 @@ export default function DashboardPage() {
       setIsRunning(false);
       eventSource.close();
     };
-  };
+  // supabase client is a stable singleton, safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleRun = async () => {
     if (isRunning || !selectedWorkflow) return;

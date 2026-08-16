@@ -1,8 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { buildNodeContext } from '@/lib/buildNodeContext';
 
-const globalModelCache: Record<string, string[]> = {};
-const globalCredCache: Record<string, any[]> = {};
+// Cache entries include a timestamp so stale data expires after CACHE_TTL_MS.
+// Without TTL, deleted/rotated credentials would show until a hard page refresh.
+const CACHE_TTL_MS = 60_000; // 60 seconds
+
+type CacheEntry<T> = { data: T; expiresAt: number };
+const globalModelCache: Record<string, CacheEntry<string[]>> = {};
+const globalCredCache: Record<string, CacheEntry<any[]>> = {};
+
+const isFresh = <T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> =>
+  !!entry && Date.now() < entry.expiresAt;
 
 const LLM_NODE_TYPES = ['geminiFactory', 'chatgptFactory', 'claudeFactory'];
 
@@ -226,14 +234,15 @@ export default function SidePanel({
     const credType = getCredentialProvider(selectedNode?.type);
 
     if (credType) {
-      if (globalCredCache[credType]) {
-        setCredentials(globalCredCache[credType]);
+      // Serve fresh cached data immediately to avoid flicker
+      if (isFresh(globalCredCache[credType])) {
+        setCredentials(globalCredCache[credType].data);
       }
       fetch(`/api/credentials?type=${credType}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data)) {
-            globalCredCache[credType] = data;
+            globalCredCache[credType] = { data, expiresAt: Date.now() + CACHE_TTL_MS };
             setCredentials(data);
           }
         })
@@ -256,8 +265,8 @@ export default function SidePanel({
   }, [selectedNode?.type]);
 
   const fetchModels = async (credId: string, forceRefresh = false) => {
-    if (!forceRefresh && globalModelCache[credId]) {
-      setDynamicModels(globalModelCache[credId]);
+    if (!forceRefresh && isFresh(globalModelCache[credId])) {
+      setDynamicModels(globalModelCache[credId].data);
       return;
     }
     setIsLoadingModels(true);
@@ -269,7 +278,7 @@ export default function SidePanel({
       if (result.error) {
         setModelsError(result.error);
       } else if (result.models) {
-        globalModelCache[credId] = result.models;
+        globalModelCache[credId] = { data: result.models, expiresAt: Date.now() + CACHE_TTL_MS };
         setDynamicModels(result.models);
       }
     } catch (err: any) {
@@ -283,7 +292,7 @@ export default function SidePanel({
 
   useEffect(() => {
     if (data.credentialId && LLM_NODE_TYPES.includes(selectedNode?.type)) {
-      if (data.model && !globalModelCache[data.credentialId]) {
+      if (data.model && !isFresh(globalModelCache[data.credentialId])) {
         setDynamicModels([data.model]);
       }
       fetchModels(data.credentialId);

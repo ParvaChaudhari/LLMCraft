@@ -1000,8 +1000,8 @@ const executeNode = async (job: Job) => {
     console.log(`[Queue] Storage Shed extracted ${Object.keys(outputObj).length} variables.`);
   } else if (currentNode.type === 'output') {
     console.log(`[Queue] Final Output Reached: ${newContext.lastOutput}`);
-    await broadcastEvent(workflowId, 'NODE_FINISHED', { nodeId, type: currentNode.type, output: newContext.lastOutput });
-    return; // End of line (output node exits here)
+    // Falls through to the unified NODE_FINISHED broadcast below (isLastNode will be true
+    // because output nodes have no outgoing edges)
   } else if (currentNode.type === 'airport') {
     const targetWorkflowId = currentNode.data?.workflowId;
     if (!targetWorkflowId) {
