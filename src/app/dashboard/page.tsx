@@ -181,6 +181,9 @@ export default function DashboardPage() {
            setIsRunning(false);
            eventSource.close();
         }
+        else if (eventName === 'NODE_PROGRESS') {
+           setLogs(prev => [...prev, `> ${eventData.message}`]);
+        }
         else if (eventName === 'NODE_PAUSED') {
            setLogs(prev => [...prev, `> Workflow paused at Checkpoint.`]);
            setIsRunning(false);

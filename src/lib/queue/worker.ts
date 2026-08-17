@@ -521,55 +521,112 @@ const executeNode = async (job: Job) => {
         const apifyToken = await fetchApiKey(credentialId);
         if (!apifyToken) throw new Error('Apify token not found.');
 
-        let finalPayloadStr = payload || '{}';
-        finalPayloadStr = replaceVariables(finalPayloadStr, newContext);
-        const finalPayloadObj = JSON.parse(finalPayloadStr);
-
-        console.log(`[Queue] Triggering Apify Actor ${actorId}...`);
-        
-        // 1. Start the run
         const formattedActorId = actorId.replace('/', '~');
         const encodedActorId = encodeURIComponent(formattedActorId);
-        const runRes = await fetch(`https://api.apify.com/v2/acts/${encodedActorId}/runs?token=${apifyToken}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(finalPayloadObj)
-        });
-        
-        if (!runRes.ok) {
-          const errText = await runRes.text();
-          throw new Error(`Apify failed to start run: ${errText}`);
-        }
-        
-        const runData = await runRes.json();
-        const runId = runData.data.id;
-        console.log(`[Queue] Apify Run Started: ${runId}. Polling for completion...`);
 
-        // 2. Poll for completion
-        let status = runData.data.status;
-        while (status === 'READY' || status === 'RUNNING') {
-          // Wait 3 seconds
-          await new Promise(r => setTimeout(r, 3000));
-          
+        // ── Re-queue pattern ────────────────────────────────────────────────────
+        // Instead of holding the worker thread in a sleep/poll loop (which blocks
+        // other jobs), we store the runId in context and re-queue this same node
+        // with a delay. Each poll cycle the node wakes, checks status, broadcasts
+        // a progress event for the live UI log, and either re-queues or finishes.
+        // ────────────────────────────────────────────────────────────────────────
+
+        const existingRunId: string | undefined = newContext[`__apify_runId_${nodeId}`];
+        const pollCount: number = newContext[`__apify_pollCount_${nodeId}`] || 0;
+
+        if (!existingRunId) {
+          // ── PASS 1: Start the actor run ───────────────────────────────────────
+          let finalPayloadStr = replaceVariables(payload || '{}', newContext);
+          const finalPayloadObj = JSON.parse(finalPayloadStr);
+
+          console.log(`[Queue] Triggering Apify Actor ${actorId}...`);
+          const runRes = await fetch(`https://api.apify.com/v2/acts/${encodedActorId}/runs?token=${apifyToken}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(finalPayloadObj)
+          });
+
+          if (!runRes.ok) {
+            const errText = await runRes.text();
+            throw new Error(`Apify failed to start run: ${errText}`);
+          }
+
+          const runData = await runRes.json();
+          const runId: string = runData.data.id;
+          console.log(`[Queue] Apify Run Started: ${runId}. Will poll every 5s.`);
+
+          // Save runId and initial dataset ID into context for subsequent polls
+          newContext[`__apify_runId_${nodeId}`] = runId;
+          newContext[`__apify_datasetId_${nodeId}`] = runData.data.defaultDatasetId;
+          newContext[`__apify_pollCount_${nodeId}`] = 0;
+
+          // Broadcast start event so dashboard shows progress immediately
+          await broadcastEvent(workflowId, 'NODE_PROGRESS', {
+            nodeId,
+            message: `[Apify] Actor started. Run ID: ${runId}`
+          });
+
+          // Re-queue this same node to poll in 5 seconds
+          await workflowQueue.add('execute-node', {
+            workflowId, nodeId, nodes, edges,
+            context: newContext
+          }, { delay: 5000 });
+
+          // Return without broadcasting NODE_FINISHED — the re-queued job will do that
+          return;
+
+        } else {
+          // ── PASS N: Poll for completion ───────────────────────────────────────
+          const runId = existingRunId;
           const pollRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
           const pollData = await pollRes.json();
-          status = pollData.data.status;
-          console.log(`[Queue] Apify Run ${runId} Status: ${status}`);
+          const status: string = pollData.data.status;
+
+          console.log(`[Queue] Apify Run ${runId} Status: ${status} (poll ${pollCount + 1})`);
+
+          if (status === 'READY' || status === 'RUNNING') {
+            // Still going — broadcast progress and re-queue
+            await broadcastEvent(workflowId, 'NODE_PROGRESS', {
+              nodeId,
+              message: `[Apify] Status: ${status} (poll ${pollCount + 1})`
+            });
+
+            newContext[`__apify_pollCount_${nodeId}`] = pollCount + 1;
+
+            await workflowQueue.add('execute-node', {
+              workflowId, nodeId, nodes, edges,
+              context: newContext
+            }, { delay: 5000 });
+
+            return; // Release the worker thread
+
+          } else if (status === 'SUCCEEDED') {
+            // Actor finished — fetch dataset and proceed downstream
+            await broadcastEvent(workflowId, 'NODE_PROGRESS', {
+              nodeId,
+              message: `[Apify] Status: SUCCEEDED — fetching dataset...`
+            });
+
+            const datasetId = newContext[`__apify_datasetId_${nodeId}`] || pollData.data.defaultDatasetId;
+            const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}`);
+            const datasetItems = await datasetRes.json();
+
+            const jsonOutput = JSON.stringify(datasetItems, null, 2);
+            newContext.lastOutput = jsonOutput;
+            newContext[nodeId] = jsonOutput;
+
+            // Clean up temporary polling keys from context
+            delete newContext[`__apify_runId_${nodeId}`];
+            delete newContext[`__apify_datasetId_${nodeId}`];
+            delete newContext[`__apify_pollCount_${nodeId}`];
+
+            console.log(`[Queue] Apify Run ${runId} Succeeded. Dataset fetched.`);
+
+          } else {
+            // FAILED, ABORTED, TIMED-OUT etc.
+            throw new Error(`Apify Run failed with status: ${status}`);
+          }
         }
-
-        if (status !== 'SUCCEEDED') {
-          throw new Error(`Apify Run failed with status: ${status}`);
-        }
-
-        // 3. Fetch Dataset
-        console.log(`[Queue] Apify Run Succeeded. Fetching dataset...`);
-        const datasetId = runData.data.defaultDatasetId; // Can also fetch from pollData
-        const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}`);
-        const datasetItems = await datasetRes.json();
-
-        const jsonOutput = JSON.stringify(datasetItems, null, 2);
-        newContext.lastOutput = jsonOutput;
-        newContext[nodeId] = jsonOutput;
       } catch (err: any) {
         console.error(`[Queue] Apify Error:`, err.message);
         newContext.lastOutput = `Error (Apify): ${err.message}`;

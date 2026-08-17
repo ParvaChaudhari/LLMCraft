@@ -9,7 +9,7 @@ type CacheEntry<T> = { data: T; expiresAt: number };
 const globalModelCache: Record<string, CacheEntry<string[]>> = {};
 const globalCredCache: Record<string, CacheEntry<any[]>> = {};
 
-const isFresh = <T>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> =>
+const isFresh = <T,>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> =>
   !!entry && Date.now() < entry.expiresAt;
 
 const LLM_NODE_TYPES = ['geminiFactory', 'chatgptFactory', 'claudeFactory'];
@@ -397,6 +397,8 @@ export default function SidePanel({
           
           if (eventName === 'NODE_STARTED') {
             setTerminalLogs(prev => [...prev, { time: timeStr, text: `Executing Node [${eventData.nodeId}]`, type: 'info' }]);
+          } else if (eventName === 'NODE_PROGRESS') {
+            setTerminalLogs(prev => [...prev, { time: timeStr, text: eventData.message, type: 'info' }]);
           } else if (eventName === 'NODE_FINISHED') {
             const isError = typeof eventData.output === 'string' && eventData.output.startsWith('Error:');
             setTerminalLogs(prev => [...prev, { 
