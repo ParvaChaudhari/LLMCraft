@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent, useCallback } from 'react';
+import { useEffect, useState, useRef, PointerEvent as ReactPointerEvent, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import IsometricCompound from './IsometricCompound';
@@ -91,7 +91,16 @@ export default function DashboardPage() {
   };
 
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
+
+  const fetchPendingApprovals = useCallback(async () => {
+    const { data } = await supabase
+      .from('pending_approvals')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+    if (data) setPendingApprovals(data);
+  }, [supabase]);
 
   const handleCreateSector = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +174,25 @@ export default function DashboardPage() {
           
           if (eventData.type === 'output') {
             setLogs(prev => [...prev, `> Output:`]);
-            setLogs(prev => [...prev, eventData.output !== undefined ? JSON.stringify(eventData.output, null, 2) : 'undefined']);
+            let formattedOutput = 'undefined';
+            if (eventData.output !== undefined) {
+              if (typeof eventData.output === 'object' && eventData.output !== null) {
+                formattedOutput = JSON.stringify(eventData.output, null, 2);
+              } else if (typeof eventData.output === 'string') {
+                try {
+                  let raw = eventData.output.trim();
+                  const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+                  if (fence) raw = fence[1].trim();
+                  const parsed = JSON.parse(raw);
+                  formattedOutput = JSON.stringify(parsed, null, 2);
+                } catch (_) {
+                  formattedOutput = eventData.output;
+                }
+              } else {
+                formattedOutput = String(eventData.output);
+              }
+            }
+            setLogs(prev => [...prev, formattedOutput]);
             
             setLogs(prev => [...prev, `> Execution complete.`]);
             setIsRunning(false);
@@ -190,14 +217,7 @@ export default function DashboardPage() {
            eventSource.close();
            
            // Refresh pending approvals automatically
-           supabase
-             .from('pending_approvals')
-             .select('*')
-             .eq('status', 'pending')
-             .order('created_at', { ascending: false })
-             .then(({ data }) => {
-               if (data) setPendingApprovals(data);
-             });
+           fetchPendingApprovals();
         }
       } catch(e) {}
     };
@@ -206,9 +226,7 @@ export default function DashboardPage() {
       setIsRunning(false);
       eventSource.close();
     };
-  // supabase client is a stable singleton, safe to omit from deps
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchPendingApprovals]);
 
   const handleRun = async () => {
     if (isRunning || !selectedWorkflow) return;
@@ -299,12 +317,7 @@ export default function DashboardPage() {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       
-      const { data: approvalsData } = await supabase
-        .from('pending_approvals')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-      if (approvalsData) setPendingApprovals(approvalsData);
+      await fetchPendingApprovals();
 
       if (data) {
         const positions = new Set();

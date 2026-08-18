@@ -1178,15 +1178,26 @@ const executeNode = async (job: Job) => {
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {
     let inputArray: any[] | null = null;
+    let isZeroLengthArray = false;
     try {
       let raw = (newContext.lastOutput || '').trim();
       const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
       if (fence) raw = fence[1].trim();
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) inputArray = parsed;
+      if (Array.isArray(parsed)) {
+        if (parsed.length > 0) {
+          inputArray = parsed;
+        } else {
+          isZeroLengthArray = true;
+        }
+      }
     } catch (_) {}
 
-    if (inputArray) {
+    if (isZeroLengthArray) {
+      console.log(`[Queue] Array mode: 0 items → passing empty array through ${currentNode.type} (${nodeId})`);
+      newContext.lastOutput = '[]';
+      newContext[nodeId] = '[]';
+    } else if (inputArray) {
       console.log(`[Queue] Array mode: ${inputArray.length} items → ${currentNode.type} (${nodeId})`);
       const results: any[] = [];
 
@@ -1306,12 +1317,12 @@ const executeNode = async (job: Job) => {
       }
       
       for (const edge of outgoingEdges) {
-        if (edge.sourceHandle === 'true' && trueItems.length > 0) {
+        if (edge.sourceHandle === 'true') {
           const edgeContext = { ...newContext };
           edgeContext.lastOutput = JSON.stringify(trueItems, null, 2);
           edgeContext[nodeId] = edgeContext.lastOutput;
           validDispatches.push({ edge, edgeContext });
-        } else if (edge.sourceHandle === 'false' && falseItems.length > 0) {
+        } else if (edge.sourceHandle === 'false') {
           const edgeContext = { ...newContext };
           edgeContext.lastOutput = JSON.stringify(falseItems, null, 2);
           edgeContext[nodeId] = edgeContext.lastOutput;
@@ -1366,18 +1377,41 @@ const executeNode = async (job: Job) => {
       const storedB = await connection.hget(mergeKey, 'b');
 
       if (storedA && storedB) {
-        // Both branches have arrived — merge and dispatch
+        // Both branches have arrived — check for errors before merging
         const contextA = JSON.parse(storedA);
         const contextB = JSON.parse(storedB);
 
-        await connection.del(mergeKey); // Clean up Redis key
+        await connection.del(mergeKey); // Always clean up the Redis key immediately
+
+        // If either branch is an error output, propagate the error instead of merging
+        const aIsError = typeof contextA.lastOutput === 'string' && contextA.lastOutput.startsWith('Error:');
+        const bIsError = typeof contextB.lastOutput === 'string' && contextB.lastOutput.startsWith('Error:');
+
+        if (aIsError || bIsError) {
+          const errMsg = aIsError ? contextA.lastOutput : contextB.lastOutput;
+          console.error(`[Queue] Junction Tower: branch error detected — ${errMsg}. Aborting merge.`);
+          await broadcastEvent(workflowId, 'NODE_ERROR', { nodeId: nextNodeId, error: errMsg });
+          continue;
+        }
+
+        const parseIfJson = (val: any) => {
+          if (typeof val !== 'string') return val;
+          try {
+            let raw = val.trim();
+            const fence = raw.match(/^```(?:json)?\n?([\s\S]*?)\n?```$/);
+            if (fence) raw = fence[1].trim();
+            return JSON.parse(raw);
+          } catch (_) {
+            return val;
+          }
+        };
 
         const mergedContext = { ...contextA, ...contextB };
         mergedContext._mergeA = contextA.lastOutput;
         mergedContext._mergeB = contextB.lastOutput;
         mergedContext.lastOutput = JSON.stringify({
-          branch_a: contextA.lastOutput,
-          branch_b: contextB.lastOutput
+          branch_a: parseIfJson(contextA.lastOutput),
+          branch_b: parseIfJson(contextB.lastOutput)
         }, null, 2);
 
         console.log(`[Queue] Junction Tower: both branches arrived — dispatching merge job.`);
@@ -1430,8 +1464,27 @@ global.__worker__.on('completed', (job) => {
   // console.log(`[Queue] Job ${job.id} completed successfully`);
 });
 
-global.__worker__.on('failed', (job, err) => {
+global.__worker__.on('failed', async (job, err) => {
   console.log(`[Queue] Job ${job?.id} failed with ${err.message}`);
+
+  // ── Merge key cleanup on hard failure ────────────────────────────────────
+  // If a job fails hard (throws unhandled), any merge node waiting on that
+  // branch will have a stale Redis key. Scan for and delete it so the key
+  // doesn't linger until the 1-hour TTL.
+  const wfId = job?.data?.workflowId;
+  if (wfId) {
+    try {
+      const pattern = `merge:${wfId}:*`;
+      const keys = await connection.keys(pattern);
+      if (keys.length > 0) {
+        await connection.del(...keys);
+        console.log(`[Queue] Cleaned up ${keys.length} orphaned merge key(s) for workflow ${wfId}.`);
+      }
+    } catch (cleanupErr) {
+      console.error('[Queue] Failed to clean up merge keys:', cleanupErr);
+    }
+  }
+  // ─────────────────────────────────────────────────────────────────────────
 });
 
 export const worker = global.__worker__;
