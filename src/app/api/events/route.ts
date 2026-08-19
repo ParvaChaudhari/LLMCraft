@@ -56,11 +56,11 @@ export async function GET(request: Request) {
 
       keepAlive = setInterval(() => {
         try {
-          controller.enqueue(encoder.encode(': keepalive\n\n'));
+          controller.enqueue(encoder.encode('data: {"event": "ping"}\n\n'));
         } catch (e) {
           cleanup();
         }
-      }, 15000);
+      }, 10000);
 
       request.signal.addEventListener('abort', () => {
         cleanup();
