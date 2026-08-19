@@ -511,6 +511,76 @@ const executeNode = async (job: Job) => {
         newContext[nodeId] = newContext.lastOutput;
       }
     }
+  } else if (currentNode.type === 'github') {
+    const { credentialId, action, repository, filePath, query, title, issueNumber, body } = currentNode.data;
+    if (!credentialId) {
+      newContext.lastOutput = 'Error: GitHub Node is missing PAT credential.';
+      newContext[nodeId] = newContext.lastOutput;
+    } else {
+      try {
+        const githubToken = await fetchApiKey(credentialId);
+        if (!githubToken) throw new Error('GitHub PAT not found.');
+
+        const headers: any = {
+          'Accept': 'application/vnd.github.v3+json',
+          'User-Agent': 'LLMCraft-Agent',
+          'Authorization': `token ${githubToken}`
+        };
+
+        const interpolatedRepo = replaceVariables(repository || '', newContext);
+        let resultString = '';
+
+        if (action === 'fetch_file') {
+          const interpolatedPath = replaceVariables(filePath || '', newContext);
+          const res = await fetch(`https://api.github.com/repos/${interpolatedRepo}/contents/${interpolatedPath}`, { headers });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.message || 'Failed to fetch file');
+          
+          if (json.content && json.encoding === 'base64') {
+            resultString = Buffer.from(json.content, 'base64').toString('utf-8');
+          } else {
+            resultString = JSON.stringify(json, null, 2);
+          }
+        } else if (action === 'search_issues') {
+          const interpolatedQuery = replaceVariables(query || '', newContext);
+          const res = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(interpolatedQuery)}`, { headers });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.message || 'Failed to search issues');
+          resultString = JSON.stringify(json.items, null, 2);
+        } else if (action === 'create_issue') {
+          const interpolatedTitle = replaceVariables(title || '', newContext);
+          const interpolatedBody = replaceVariables(body || '', newContext);
+          const res = await fetch(`https://api.github.com/repos/${interpolatedRepo}/issues`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: interpolatedTitle, body: interpolatedBody })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.message || 'Failed to create issue');
+          resultString = JSON.stringify({ issue_url: json.html_url, number: json.number });
+        } else if (action === 'post_comment') {
+          const interpolatedIssueNumber = replaceVariables(issueNumber || '', newContext);
+          const interpolatedBody = replaceVariables(body || '', newContext);
+          const res = await fetch(`https://api.github.com/repos/${interpolatedRepo}/issues/${interpolatedIssueNumber}/comments`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: interpolatedBody })
+          });
+          const json = await res.json();
+          if (!res.ok) throw new Error(json.message || 'Failed to post comment');
+          resultString = JSON.stringify({ comment_url: json.html_url });
+        } else {
+          throw new Error(`Unsupported GitHub action: ${action}`);
+        }
+
+        newContext.lastOutput = resultString;
+        newContext[nodeId] = resultString;
+      } catch (err: any) {
+        console.error(`[Queue] GitHub Error:`, err.message);
+        newContext.lastOutput = `Error: ${err.message}`;
+        newContext[nodeId] = newContext.lastOutput;
+      }
+    }
   } else if (currentNode.type === 'apify') {
     const { credentialId, actorId, payload } = currentNode.data;
     if (!credentialId || !actorId) {
