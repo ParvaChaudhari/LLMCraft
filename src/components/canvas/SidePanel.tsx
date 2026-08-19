@@ -23,6 +23,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'apify') return 'apify';
   if (nodeType === 'postOffice') return 'resend';
   if (nodeType === 'googleDrive') return 'google_drive';
+  if (nodeType === 'github') return 'github';
   return null;
 };
 
@@ -100,6 +101,7 @@ const toolAssets: Record<string, string> = {
   variable: 'storage_shed.png',
   airport: 'airport.png',
   checkpoint: 'checkpoint.png',
+  github: 'github.png',
 };
 
 export default function SidePanel({
@@ -643,7 +645,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -1311,6 +1313,157 @@ export default function SidePanel({
                             spellCheck={false}
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'github' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">GitHub PAT Credential</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={data.credentialId || ''}
+                              onChange={(e) => handleChange('credentialId', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                            >
+                              <option value="">-- Select GitHub PAT --</option>
+                              {credentials.filter(c => c.type === 'github').map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => setShowNewCredForm(!showNewCredForm)}
+                              className="bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button px-4 py-1 font-bold text-[length:var(--text-code-sm)] transition-colors"
+                            >
+                              {showNewCredForm ? '-' : '+'}
+                            </button>
+                          </div>
+
+                          {showNewCredForm && (
+                            <div className="mt-2 p-4 bg-[var(--color-inverse-surface)] inset-input space-y-4">
+                              <h4 className="text-[var(--color-inverse-primary)] font-bold text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] uppercase tracking-widest border-b border-[var(--color-on-surface)] pb-2">Create New Credential</h4>
+                              <div>
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">Credential Name</label>
+                                <input
+                                  type="text"
+                                  value={newCredName}
+                                  onChange={(e) => setNewCredName(e.target.value)}
+                                  placeholder="e.g. GitHub Token"
+                                  autoComplete="off"
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-on-surface-variant)]">Personal Access Token</label>
+                                <input
+                                  type="password"
+                                  value={newCredKey}
+                                  onChange={(e) => setNewCredKey(e.target.value)}
+                                  placeholder="ghp_..."
+                                  autoComplete="new-password"
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                />
+                              </div>
+                              <button
+                                onClick={handleCreateCredential}
+                                disabled={!newCredName || !newCredKey || isSavingCred}
+                                className="w-full bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)] font-bold py-2 px-4 uppercase tracking-wider tactile-button disabled:opacity-50"
+                              >
+                                {isSavingCred ? 'Saving...' : 'Save & Select'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Action</label>
+                          <select
+                            value={data.action || 'fetch_file'}
+                            onChange={(e) => handleChange('action', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold mb-4"
+                          >
+                            <option value="fetch_file">Fetch File</option>
+                            <option value="search_issues">Search Issues</option>
+                            <option value="create_issue">Create Issue</option>
+                            <option value="post_comment">Post Comment</option>
+                          </select>
+                        </div>
+                        
+                        {(data.action === 'fetch_file' || data.action === 'create_issue' || data.action === 'post_comment') && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Repository</label>
+                            <input
+                              type="text"
+                              value={data.repository || ''}
+                              onChange={(e) => handleChange('repository', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder="owner/repo"
+                            />
+                          </div>
+                        )}
+
+                        {data.action === 'fetch_file' && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">File Path</label>
+                            <input
+                              type="text"
+                              value={data.filePath || ''}
+                              onChange={(e) => handleChange('filePath', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder="src/lib/worker.ts"
+                            />
+                          </div>
+                        )}
+
+                        {data.action === 'search_issues' && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Search Query</label>
+                            <input
+                              type="text"
+                              value={data.query || ''}
+                              onChange={(e) => handleChange('query', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder="repo:owner/repo is:open label:bug"
+                            />
+                          </div>
+                        )}
+
+                        {data.action === 'create_issue' && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Issue Title</label>
+                            <input
+                              type="text"
+                              value={data.title || ''}
+                              onChange={(e) => handleChange('title', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                              placeholder="Automated Bug Report"
+                            />
+                          </div>
+                        )}
+
+                        {(data.action === 'post_comment' || data.action === 'create_issue') && (
+                          <div>
+                            {data.action === 'post_comment' && (
+                              <div className="mb-4">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Issue / PR Number</label>
+                                <input
+                                  type="text"
+                                  value={data.issueNumber || ''}
+                                  onChange={(e) => handleChange('issueNumber', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                  placeholder="123"
+                                />
+                              </div>
+                            )}
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Body (Markdown)</label>
+                            <textarea
+                              value={data.body || '{{lastOutput}}'}
+                              onChange={(e) => handleChange('body', e.target.value)}
+                              className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] py-1 px-2 inset-input outline-none resize-y"
+                              placeholder="{{lastOutput}}"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
 

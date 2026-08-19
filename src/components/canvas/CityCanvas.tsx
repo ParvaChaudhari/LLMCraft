@@ -47,6 +47,7 @@ import GoogleDriveNode from './nodes/GoogleDriveNode';
 import VariableNode from './nodes/VariableNode';
 import AirportNode from './nodes/AirportNode';
 import CheckpointNode from './nodes/CheckpointNode';
+import GithubNode from './nodes/GithubNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -82,6 +83,7 @@ const nodeTypes = {
   postOffice: PostOfficeNode,
   airport: AirportNode,
   checkpoint: CheckpointNode,
+  github: GithubNode,
 };
 
 const edgeTypes = {
