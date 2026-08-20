@@ -31,11 +31,12 @@ const connection = new IORedis(process.env.REDIS_URL || 'redis://127.0.0.1:6379'
 // Create the Queue
 export const workflowQueue = new Queue('workflow-queue', { connection: connection as any });
 
-// Server-side Supabase client — intentionally NOT the browser client
-// The worker runs in Node.js with no user session; anon key is correct here.
+// Server-side Supabase client — uses service role key to bypass RLS
+// The worker runs in Node.js with no user session, so we need elevated privileges
+// to read credentials and update execution rows.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 // Helper to broadcast events via Redis Pub/Sub
@@ -1418,13 +1419,25 @@ const executeNode = async (job: Job) => {
 
   // Broadcast completion of current node
   newContext[nodeId] = newContext.lastOutput;
+  const isLastNode = validDispatches.length === 0;
+  
   await broadcastEvent(workflowId, 'NODE_FINISHED', { 
     nodeId, 
     type: currentNode.type, 
     output: newContext.lastOutput,
-    isLastNode: validDispatches.length === 0
+    isLastNode
   });
-  
+
+  if (isLastNode && !workflowId.includes('node-exec-')) {
+    try {
+      await supabase
+        .from('executions')
+        .update({ status: 'success', state_json: newContext })
+        .eq('id', workflowId);
+    } catch (e) {
+      console.error('[Queue] Failed to update execution row on success:', e);
+    }
+  }
   for (const { edge, edgeContext } of validDispatches) {
     let nextNodeId = edge.target;
     const nextNode = nodes.find((n: any) => n.id === nextNodeId);
@@ -1552,6 +1565,17 @@ global.__worker__.on('failed', async (job, err) => {
       }
     } catch (cleanupErr) {
       console.error('[Queue] Failed to clean up merge keys:', cleanupErr);
+    }
+
+    if (!wfId.includes('node-exec-')) {
+      try {
+        await supabase
+          .from('executions')
+          .update({ status: 'error', state_json: { error: err.message, context: job?.data?.context || {} } })
+          .eq('id', wfId);
+      } catch (e) {
+        console.error('[Queue] Failed to update execution row on failure:', e);
+      }
     }
   }
   // ─────────────────────────────────────────────────────────────────────────

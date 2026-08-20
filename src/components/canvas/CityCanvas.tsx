@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState, useEffect, DragEvent, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
   ReactFlow,
@@ -131,6 +131,11 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
   const isPlayingRef = useRef(false);
   
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const execId = searchParams.get('execId');
+  const [isPlaybackMode, setIsPlaybackMode] = useState(!!execId);
+  const [playbackTime, setPlaybackTime] = useState<string>('');
+  
   const supabase = createClient();
 
   useEffect(() => {
@@ -160,7 +165,21 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       }
 
       if (data && data.graph_json) {
-        setNodes(data.graph_json.nodes || []);
+        let loadedNodes = data.graph_json.nodes || [];
+        
+        if (execId) {
+          const { data: execData } = await supabase.from('executions').select('*').eq('id', execId).single();
+          if (execData && execData.state_json && execData.state_json.context) {
+            const context = execData.state_json.context;
+            setPlaybackTime(new Date(execData.created_at).toLocaleString());
+            loadedNodes = loadedNodes.map((n: Node) => ({
+              ...n,
+              data: { ...n.data, output: context[n.id] }
+            }));
+          }
+        }
+
+        setNodes(loadedNodes);
         setEdges(data.graph_json.edges || []);
         setWorkflowId(data.id);
       }
@@ -359,7 +378,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges }),
+        body: JSON.stringify({ nodes, edges, workflowId }),
       });
 
       let resData;
@@ -430,8 +449,9 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         } catch(e) {}
       };
 
-      eventSource.onerror = (err) => {
-        console.error("SSE Error:", err);
+      eventSource.onerror = () => {
+        // Browsers fire onerror when the SSE stream closes — even after a clean
+        // successful finish. Only treat it as an error if we haven't finished yet.
         eventSource.close();
         setIsRunning(false);
       };
@@ -538,65 +558,86 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
 
       {/* Top right Buttons */}
       <div className="absolute top-4 right-4 z-10 flex gap-4 items-center">
-        {/* Hardware Slider Toggle */}
-        <div 
-          className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-80 h-12 cursor-pointer"
-          onClick={() => setVisualMode(visualMode === 'roads' ? 'pipes' : 'roads')}
-        >
-          {/* Sliding Block */}
-          <div 
-            className={`absolute h-10 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              visualMode === 'pipes' ? 'left-[calc(50%+2px)]' : 'left-1'
-            }`}
-          />
-          {/* Labels */}
-          <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] pointer-events-none select-none">
-            <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'roads' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
-              <span className="material-symbols-outlined text-[18px]">domain</span>
-              <div className="flex flex-col items-start leading-none justify-center">
-                <span>City</span>
-                <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Animation mode)</span>
-              </div>
-            </div>
-            <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'pipes' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
-              <span className="material-symbols-outlined text-[18px]">account_tree</span>
-              <div className="flex flex-col items-start leading-none justify-center">
-                <span>DataPipeline</span>
-                <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Fast Mode)</span>
-              </div>
-            </div>
+        {isPlaybackMode ? (
+          <div className="bg-[#ffeb3b] text-black border-2 border-black p-3 font-[family-name:var(--font-code-sm)] text-xs font-bold shadow-[3px_3px_0_#000] flex items-center justify-center gap-2 relative pointer-events-auto">
+            <span className="material-symbols-outlined">history</span>
+            VIEWING PAST EXECUTION ({playbackTime})
+            <button 
+              onClick={() => {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('execId');
+                router.replace(url.pathname);
+                setIsPlaybackMode(false);
+                window.location.reload();
+              }}
+              className="ml-4 bg-black text-white px-2 py-1 hover:bg-gray-800 transition-colors pointer-events-auto cursor-pointer"
+            >
+              EXIT
+            </button>
           </div>
-        </div>
-        
-        {/* Actions */}
-        <div className="flex gap-3 ml-2">
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-tertiary-fixed)] hover:text-[var(--color-on-background)] tactile-button transition-colors disabled:opacity-50 group"
-            title="Save Layout"
-          >
-            {isSaving ? (
-              <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
-            ) : (
-              <span className="material-symbols-outlined text-[24px]">save</span>
-            )}
-          </button>
-          <button
-            onClick={handleRun}
-            disabled={isRunning}
-            className={`w-12 h-12 flex items-center justify-center tactile-button transition-colors disabled:opacity-50 ${
-              isRunning ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]' : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)]'
-            }`}
-            title="Run Pipeline"
-          >
-            {isRunning ? (
-              <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
-            ) : (
-              <span className="material-symbols-outlined text-[24px]">play_arrow</span>
-            )}
-          </button>
-        </div>
+        ) : (
+          <>
+            {/* Hardware Slider Toggle */}
+            <div 
+              className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-80 h-12 cursor-pointer"
+              onClick={() => setVisualMode(visualMode === 'roads' ? 'pipes' : 'roads')}
+            >
+              {/* Sliding Block */}
+              <div 
+                className={`absolute h-10 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                  visualMode === 'pipes' ? 'left-[calc(50%+2px)]' : 'left-1'
+                }`}
+              />
+              {/* Labels */}
+              <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] pointer-events-none select-none">
+                <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'roads' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+                  <span className="material-symbols-outlined text-[18px]">domain</span>
+                  <div className="flex flex-col items-start leading-none justify-center">
+                    <span>City</span>
+                    <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Animation mode)</span>
+                  </div>
+                </div>
+                <div className={`flex-1 flex items-center justify-center gap-2 transition-colors ${visualMode === 'pipes' ? 'text-[var(--color-on-surface)]' : 'text-[var(--color-surface-variant)] opacity-50'}`}>
+                  <span className="material-symbols-outlined text-[18px]">account_tree</span>
+                  <div className="flex flex-col items-start leading-none justify-center">
+                    <span>DataPipeline</span>
+                    <span className="text-[9px] opacity-70 font-normal mt-[2px]">(Fast Mode)</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex gap-3 ml-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="w-12 h-12 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-tertiary-fixed)] hover:text-[var(--color-on-background)] tactile-button transition-colors disabled:opacity-50 group"
+                title="Save Layout"
+              >
+                {isSaving ? (
+                  <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+                ) : (
+                  <span className="material-symbols-outlined text-[24px]">save</span>
+                )}
+              </button>
+              <button
+                onClick={handleRun}
+                disabled={isRunning}
+                className={`w-12 h-12 flex items-center justify-center tactile-button transition-colors disabled:opacity-50 ${
+                  isRunning ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]' : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)]'
+                }`}
+                title="Run Pipeline"
+              >
+                {isRunning ? (
+                  <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
+                ) : (
+                  <span className="material-symbols-outlined text-[24px]">play_arrow</span>
+                )}
+              </button>
+            </div>
+          </>
+        )}
         
         <button
           onClick={() => router.push('/dashboard')}

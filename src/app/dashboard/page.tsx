@@ -23,6 +23,27 @@ export default function DashboardPage() {
   const [logs, setLogs] = useState<string[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
+  // History State
+  const [activeTab, setActiveTab] = useState<'logs' | 'history'>('logs');
+  const [history, setHistory] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'history' && selectedWorkflow) {
+      setIsLoadingHistory(true);
+      supabase
+        .from('executions')
+        .select('id, status, created_at')
+        .eq('workflow_id', selectedWorkflow.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+        .then(({ data, error }) => {
+          if (!error && data) setHistory(data);
+          setIsLoadingHistory(false);
+        });
+    }
+  }, [activeTab, selectedWorkflow]);
+
   const [showInbox, setShowInbox] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState<any[]>([]);
 
@@ -251,7 +272,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nodes, edges }),
+        body: JSON.stringify({ nodes, edges, workflowId: selectedWorkflow.id }),
       });
 
       let resData;
@@ -581,29 +602,81 @@ export default function DashboardPage() {
               boxShadow: 'inset 0 4px 10px rgba(0,0,0,0.5)', display: 'flex', flexDirection: 'column',
               overflow: 'hidden',
             }}>
-              <div style={{ padding: '6px 10px', borderBottom: '2px solid #1d1b1a', fontSize: 10, fontWeight: 700, color: 'white', letterSpacing: '0.08em', display: 'flex', justifyContent: 'space-between' }}>
-                <span>CITY_LOGS.EXE</span>
-                {isRunning && <span className="material-symbols-outlined animate-spin" style={{ fontSize: 12 }}>sync</span>}
+              <div style={{ display: 'flex', borderBottom: '2px solid #1d1b1a' }}>
+                <button 
+                  onClick={() => setActiveTab('logs')}
+                  style={{ flex: 1, padding: '6px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', backgroundColor: activeTab === 'logs' ? '#4a4744' : 'transparent', color: activeTab === 'logs' ? 'white' : '#888', border: 'none', borderRight: '2px solid #1d1b1a', cursor: 'pointer' }}
+                >
+                  CITY_LOGS.EXE
+                </button>
+                <button 
+                  onClick={() => setActiveTab('history')}
+                  style={{ flex: 1, padding: '6px 10px', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', backgroundColor: activeTab === 'history' ? '#4a4744' : 'transparent', color: activeTab === 'history' ? 'white' : '#888', border: 'none', cursor: 'pointer' }}
+                >
+                  HISTORY.LOG
+                </button>
               </div>
-              <div style={{
-                flex: 1, padding: '10px', overflowY: 'auto',
-                fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: '1.6',
-                color: '#c8c6c6', display: 'flex', flexDirection: 'column', gap: 6,
-                whiteSpace: 'pre-wrap'
-              }}>
-                {logs.length === 0 ? (
-                  <>
-                    <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
-                    <div>&gt; Awaiting deployment sequence...</div>
-                  </>
-                ) : (
-                  logs.map((log, i) => (
-                    <div key={i} style={{ color: log.includes('ERROR') ? '#ff5555' : log.includes('>') ? '#00e639' : '#c8c6c6' }}>
-                      {log}
-                    </div>
-                  ))
-                )}
-              </div>
+
+              {activeTab === 'logs' ? (
+                <div style={{
+                  flex: 1, padding: '10px', overflowY: 'auto',
+                  fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: '1.6',
+                  color: '#c8c6c6', display: 'flex', flexDirection: 'column', gap: 6,
+                  whiteSpace: 'pre-wrap'
+                }}>
+                  {logs.length === 0 ? (
+                    <>
+                      <div style={{ color: '#00e639' }}>&gt; System initialized.</div>
+                      <div>&gt; Awaiting deployment sequence...</div>
+                    </>
+                  ) : (
+                    logs.map((log, i) => (
+                      <div key={i} style={{ color: log.includes('ERROR') ? '#ff5555' : log.includes('>') ? '#00e639' : '#c8c6c6' }}>
+                        {log}
+                      </div>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div style={{
+                  flex: 1, padding: '10px', overflowY: 'auto',
+                  fontFamily: 'JetBrains Mono', fontSize: 10, lineHeight: '1.6',
+                  color: '#c8c6c6', display: 'flex', flexDirection: 'column', gap: 6
+                }}>
+                  {isLoadingHistory ? (
+                    <div style={{ color: '#888' }}>Loading history...</div>
+                  ) : history.length === 0 ? (
+                    <div style={{ color: '#888' }}>No execution history found.</div>
+                  ) : (
+                    history.map(exec => (
+                      <div 
+                        key={exec.id} 
+                        onClick={() => router.push(`/city/${selectedWorkflow.id}?execId=${exec.id}`)}
+                        style={{
+                          padding: '8px', 
+                          backgroundColor: 'rgba(0,0,0,0.2)', 
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center'
+                        }}
+                        className="hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+                      >
+                        <div>
+                          <div style={{ color: exec.status === 'success' ? '#00e639' : exec.status === 'error' ? '#ff5555' : '#e6e600', fontWeight: 'bold' }}>
+                            {exec.status.toUpperCase()}
+                          </div>
+                          <div style={{ fontSize: 8, color: '#888' }}>
+                            {new Date(exec.created_at).toLocaleString()}
+                          </div>
+                        </div>
+                        <span className="material-symbols-outlined text-xs text-gray-500">open_in_new</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
           </aside>
         )}
