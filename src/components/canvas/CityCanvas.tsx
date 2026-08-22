@@ -168,9 +168,11 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         let loadedNodes = data.graph_json.nodes || [];
         
         if (execId) {
-          const { data: execData } = await supabase.from('executions').select('*').eq('id', execId).single();
-          if (execData && execData.state_json && execData.state_json.context) {
-            const context = execData.state_json.context;
+          const { data: execData, error: execError } = await supabase.from('executions').select('*').eq('id', execId).single();
+          console.log('[Playback] execData:', execData, 'error:', execError);
+          if (execData && execData.state_json) {
+            // Worker saves newContext directly as state_json (not nested under .context)
+            const context = execData.state_json;
             setPlaybackTime(new Date(execData.created_at).toLocaleString());
             loadedNodes = loadedNodes.map((n: Node) => ({
               ...n,
@@ -564,11 +566,8 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
             VIEWING PAST EXECUTION ({playbackTime})
             <button 
               onClick={() => {
-                const url = new URL(window.location.href);
-                url.searchParams.delete('execId');
-                router.replace(url.pathname);
-                setIsPlaybackMode(false);
-                window.location.reload();
+                // Navigate cleanly without execId — no race condition
+                window.location.href = window.location.pathname;
               }}
               className="ml-4 bg-black text-white px-2 py-1 hover:bg-gray-800 transition-colors pointer-events-auto cursor-pointer"
             >
