@@ -78,6 +78,8 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
     googleDrive:     'gdrive_vault.png',
     variable:        'storage_shed.png',
     postOffice:      'postoffice.png',
+    github:          'github.png',
+    sawmill:         'sawmill.png',
     // Generic/utility nodes intentionally excluded:
     //   conditional, limitToll
   };

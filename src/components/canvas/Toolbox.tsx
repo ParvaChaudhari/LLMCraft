@@ -37,6 +37,7 @@ const toolItems: ToolItem[] = [
   { type: 'airport',        name: 'Agent Runway',     icon: 'flight_takeoff', description: 'Invoke Sub-Workflow',        longDescription: 'Invoke another saved workflow as a sub-agent. Suspends execution until the sub-agent returns its final output.', color: '#ef4444', asset: 'airport.png' },
   { type: 'checkpoint',     name: 'Checkpoint',       icon: 'pan_tool', description: 'Human in the Loop',        longDescription: 'Pause the workflow and wait for manual human approval before continuing. You can approve or reject the payload.', color: '#eab308', asset: 'checkpoint.png' },
   { type: 'github',         name: 'Version Control',  icon: 'code', description: 'GitHub API',               longDescription: 'Interact with GitHub repositories via the REST API. Fetch files, search issues, create issues, or post comments directly to GitHub.', color: '#10b981', asset: 'github.png' },
+  { type: 'sawmill',        name: 'Sawmill',          icon: 'content_cut', description: 'Text Chunker',             longDescription: 'Splits long text into overlapping chunks for RAG pipelines. Outputs a JSON array of strings.', color: '#d97706', asset: 'sawmill.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

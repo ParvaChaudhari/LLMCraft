@@ -48,6 +48,7 @@ import VariableNode from './nodes/VariableNode';
 import AirportNode from './nodes/AirportNode';
 import CheckpointNode from './nodes/CheckpointNode';
 import GithubNode from './nodes/GithubNode';
+import SawmillNode from './nodes/SawmillNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -84,6 +85,7 @@ const nodeTypes = {
   airport: AirportNode,
   checkpoint: CheckpointNode,
   github: GithubNode,
+  sawmill: SawmillNode,
 };
 
 const edgeTypes = {
@@ -169,7 +171,6 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         
         if (execId) {
           const { data: execData, error: execError } = await supabase.from('executions').select('*').eq('id', execId).single();
-          console.log('[Playback] execData:', execData, 'error:', execError);
           if (execData && execData.state_json) {
             // Worker saves newContext directly as state_json (not nested under .context)
             const context = execData.state_json;
@@ -187,7 +188,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       }
     }
     loadWorkflow();
-  }, [router, supabase, cityId]);
+  }, [router, supabase, cityId, execId]);
 
   const handleSave = async () => {
     setIsSaving(true);

@@ -1233,6 +1233,65 @@ const executeNode = async (job: Job) => {
       await broadcastEvent(workflowId, 'NODE_PAUSED', { nodeId, type: currentNode.type });
       return false; // 🛑 HALT EXECUTION HERE
     }
+  } else if (currentNode.type === 'sawmill') {
+    const input = String(newContext.lastOutput ?? '');
+    const chunkSize = Math.max(1, parseInt(currentNode.data?.chunkSize) || 500);
+    const overlap = Math.max(0, Math.min(chunkSize - 1, parseInt(currentNode.data?.overlap) || 50));
+    const splitBy = currentNode.data?.splitBy || 'characters';
+
+    console.log(`[Queue] Sawmill chunking ${input.length} chars with strategy: ${splitBy} (size: ${chunkSize}, overlap: ${overlap})`);
+
+    const chunks: string[] = [];
+
+    if (!input.trim()) {
+      newContext.lastOutput = '[]';
+      newContext[nodeId] = '[]';
+    } else if (splitBy === 'words') {
+      const words = input.trim().split(/\s+/);
+      const step = Math.max(1, chunkSize - overlap);
+      for (let i = 0; i < words.length; i += step) {
+        chunks.push(words.slice(i, i + chunkSize).join(' '));
+        if (i + chunkSize >= words.length) break;
+      }
+    } else if (splitBy === 'paragraphs') {
+      const paragraphs = input.split(/\n\s*\n+/).filter(p => p.trim().length > 0);
+      let current = '';
+      for (const p of paragraphs) {
+        if (current && (current + '\n\n' + p).length > chunkSize) {
+          chunks.push(current.trim());
+          const carryOver = overlap > 0 ? current.slice(-overlap) + '\n\n' : '';
+          current = carryOver + p;
+        } else {
+          current = current ? current + '\n\n' + p : p;
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+    } else if (splitBy === 'sentences') {
+      const rawSentences = input.match(/[^.!?]+[.!?]+(\s+|$)|[^.!?]+$/g) || [input];
+      const sentences = rawSentences.map(s => s.trim()).filter(s => s.length > 0);
+      let current = '';
+      for (const s of sentences) {
+        if (current && (current + ' ' + s).length > chunkSize) {
+          chunks.push(current.trim());
+          const carryOver = overlap > 0 ? current.slice(-overlap) + ' ' : '';
+          current = carryOver + s;
+        } else {
+          current = current ? current + ' ' + s : s;
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+    } else {
+      // Default: characters sliding window
+      const step = Math.max(1, chunkSize - overlap);
+      for (let i = 0; i < input.length; i += step) {
+        chunks.push(input.slice(i, i + chunkSize));
+        if (i + chunkSize >= input.length) break;
+      }
+    }
+
+    newContext.lastOutput = JSON.stringify(chunks, null, 2);
+    newContext[nodeId] = newContext.lastOutput;
+    console.log(`[Queue] Sawmill generated ${chunks.length} chunk(s).`);
   }
   return true;
   // End of runLogic
@@ -1244,7 +1303,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint', 'sawmill'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {

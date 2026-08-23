@@ -102,6 +102,7 @@ const toolAssets: Record<string, string> = {
   airport: 'airport.png',
   checkpoint: 'checkpoint.png',
   github: 'github.png',
+  sawmill: 'sawmill.png',
 };
 
 export default function SidePanel({
@@ -645,7 +646,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -1799,6 +1800,48 @@ export default function SidePanel({
                             <pre className="text-[var(--color-tertiary-fixed-dim)] font-[family-name:var(--font-code-sm)] text-xs mt-1 whitespace-pre-wrap">{`{\n  "branch_a": "...",\n  "branch_b": "..."\n}`}</pre>
                             <p className="text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-xs mt-2">Use <span className="text-[var(--color-on-surface)] font-bold">{"{{_mergeA}}"}</span> or <span className="text-[var(--color-on-surface)] font-bold">{"{{_mergeB}}"}</span> in downstream prompts to reference each branch individually.</p>
                           </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'sawmill' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Split Strategy</label>
+                          <select
+                            value={data.splitBy || 'characters'}
+                            onChange={(e) => handleChange('splitBy', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="characters">Characters</option>
+                            <option value="words">Words</option>
+                            <option value="paragraphs">Paragraphs (Double Newline)</option>
+                            <option value="sentences">Sentences (. ! ?)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Chunk Size ({data.splitBy === 'words' ? 'words' : 'chars'})</label>
+                          <input
+                            type="number"
+                            value={data.chunkSize !== undefined ? data.chunkSize : 500}
+                            onChange={(e) => handleChange('chunkSize', e.target.value === '' ? '' : parseInt(e.target.value))}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="500"
+                            min="1"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Overlap ({data.splitBy === 'words' ? 'words' : 'chars'})</label>
+                          <input
+                            type="number"
+                            value={data.overlap !== undefined ? data.overlap : 50}
+                            onChange={(e) => handleChange('overlap', e.target.value === '' ? '' : parseInt(e.target.value))}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="50"
+                            min="0"
+                          />
                         </div>
                       </div>
                     )}
