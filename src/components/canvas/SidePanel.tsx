@@ -103,6 +103,7 @@ const toolAssets: Record<string, string> = {
   checkpoint: 'checkpoint.png',
   github: 'github.png',
   sawmill: 'sawmill.png',
+  textRefinery: 'text_refinery.png',
 };
 
 export default function SidePanel({
@@ -646,7 +647,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -1843,6 +1844,122 @@ export default function SidePanel({
                             min="0"
                           />
                         </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'textRefinery' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Refinery Mode</label>
+                          <select
+                            value={data.mode || 'extract_regex'}
+                            onChange={(e) => handleChange('mode', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="extract_regex">Extract Regex Matches</option>
+                            <option value="replace_regex">Search & Replace (Regex / Text)</option>
+                            <option value="case_transform">Case & Text Formatter</option>
+                          </select>
+                        </div>
+
+                        {(data.mode === 'extract_regex' || !data.mode) && (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Regex Pattern</label>
+                              <input
+                                type="text"
+                                value={data.pattern !== undefined ? data.pattern : '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}'}
+                                onChange={(e) => handleChange('pattern', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-mono"
+                                placeholder="e.g. \\d{4}-\\d{2}-\\d{2}"
+                              />
+                            </div>
+
+                            <div className="flex gap-3">
+                              <div className="w-1/3">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Flags</label>
+                                <input
+                                  type="text"
+                                  value={data.flags !== undefined ? data.flags : 'g'}
+                                  onChange={(e) => handleChange('flags', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-mono"
+                                  placeholder="g, i, m"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Output Format</label>
+                                <select
+                                  value={data.matchFormat || 'all_array'}
+                                  onChange={(e) => handleChange('matchFormat', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                                >
+                                  <option value="all_array">JSON Array of Matches</option>
+                                  <option value="first_match">First Match Only (String)</option>
+                                  <option value="joined_newline">Joined with Newlines</option>
+                                  <option value="joined_comma">Joined with Commas</option>
+                                </select>
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {data.mode === 'replace_regex' && (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Search Pattern (Regex or Text)</label>
+                              <input
+                                type="text"
+                                value={data.pattern !== undefined ? data.pattern : ''}
+                                onChange={(e) => handleChange('pattern', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-mono"
+                                placeholder="e.g. \\s+ or bad_word"
+                              />
+                            </div>
+
+                            <div className="flex gap-3">
+                              <div className="w-1/3">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Flags</label>
+                                <input
+                                  type="text"
+                                  value={data.flags !== undefined ? data.flags : 'g'}
+                                  onChange={(e) => handleChange('flags', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-mono"
+                                  placeholder="g, i, m"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Replace With</label>
+                                <input
+                                  type="text"
+                                  value={data.replaceWith !== undefined ? data.replaceWith : ''}
+                                  onChange={(e) => handleChange('replaceWith', e.target.value)}
+                                  className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                  placeholder="e.g. [REDACTED] or $1"
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+
+                        {data.mode === 'case_transform' && (
+                          <div>
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Transform Type</label>
+                            <select
+                              value={data.caseType || 'title_case'}
+                              onChange={(e) => handleChange('caseType', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                            >
+                              <option value="uppercase">UPPERCASE</option>
+                              <option value="lowercase">lowercase</option>
+                              <option value="title_case">Title Case</option>
+                              <option value="camel_case">camelCase</option>
+                              <option value="snake_case">snake_case</option>
+                              <option value="kebab_case">kebab-case</option>
+                              <option value="trim">Trim Whitespace</option>
+                              <option value="slugify">URL Slug (slug-style)</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

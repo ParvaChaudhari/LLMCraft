@@ -80,6 +80,7 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
     postOffice:      'postoffice.png',
     github:          'github.png',
     sawmill:         'sawmill.png',
+    textRefinery:    'text_refinery.png',
     // Generic/utility nodes intentionally excluded:
     //   conditional, limitToll
   };

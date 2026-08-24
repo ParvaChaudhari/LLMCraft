@@ -1292,6 +1292,99 @@ const executeNode = async (job: Job) => {
     newContext.lastOutput = JSON.stringify(chunks, null, 2);
     newContext[nodeId] = newContext.lastOutput;
     console.log(`[Queue] Sawmill generated ${chunks.length} chunk(s).`);
+  } else if (currentNode.type === 'textRefinery') {
+    const input = String(newContext.lastOutput ?? '');
+    const mode = currentNode.data?.mode || 'extract_regex';
+
+    try {
+      if (mode === 'extract_regex') {
+        const rawPattern = currentNode.data?.pattern !== undefined ? currentNode.data.pattern : '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}';
+        const flags = currentNode.data?.flags || 'g';
+        const matchFormat = currentNode.data?.matchFormat || 'all_array';
+
+        if (!rawPattern) {
+          throw new Error('No regex pattern provided for extraction.');
+        }
+
+        const regex = new RegExp(rawPattern, flags);
+        console.log(`[Queue] Text Refinery extracting with pattern /${rawPattern}/${flags}`);
+
+        const matches: string[] = [];
+        if (flags.includes('g')) {
+          const found = input.match(regex);
+          if (found) matches.push(...found);
+        } else {
+          const match = input.match(regex);
+          if (match) matches.push(match[0]);
+        }
+
+        if (matchFormat === 'first_match') {
+          newContext.lastOutput = matches.length > 0 ? matches[0] : '';
+        } else if (matchFormat === 'joined_newline') {
+          newContext.lastOutput = matches.join('\n');
+        } else if (matchFormat === 'joined_comma') {
+          newContext.lastOutput = matches.join(', ');
+        } else {
+          newContext.lastOutput = JSON.stringify(matches, null, 2);
+        }
+      } else if (mode === 'replace_regex') {
+        const rawPattern = currentNode.data?.pattern || '';
+        const flags = currentNode.data?.flags || 'g';
+        const replaceWith = currentNode.data?.replaceWith !== undefined ? currentNode.data.replaceWith : '';
+
+        if (!rawPattern) {
+          newContext.lastOutput = input;
+        } else {
+          const regex = new RegExp(rawPattern, flags);
+          console.log(`[Queue] Text Refinery replacing /${rawPattern}/${flags} with "${replaceWith}"`);
+          newContext.lastOutput = input.replace(regex, replaceWith);
+        }
+      } else if (mode === 'case_transform') {
+        const caseType = currentNode.data?.caseType || 'title_case';
+        console.log(`[Queue] Text Refinery transforming casing: ${caseType}`);
+
+        if (caseType === 'uppercase') {
+          newContext.lastOutput = input.toUpperCase();
+        } else if (caseType === 'lowercase') {
+          newContext.lastOutput = input.toLowerCase();
+        } else if (caseType === 'title_case') {
+          newContext.lastOutput = input.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substring(1).toLowerCase());
+        } else if (caseType === 'camel_case') {
+          newContext.lastOutput = input
+            .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => index === 0 ? word.toLowerCase() : word.toUpperCase())
+            .replace(/\s+/g, '');
+        } else if (caseType === 'snake_case') {
+          newContext.lastOutput = input
+            .trim()
+            .replace(/([a-z])([A-Z])/g, '$1_$2')
+            .replace(/[\s\W-]+/g, '_')
+            .toLowerCase();
+        } else if (caseType === 'kebab_case') {
+          newContext.lastOutput = input
+            .trim()
+            .replace(/([a-z])([A-Z])/g, '$1-$2')
+            .replace(/[\s\W_]+/g, '-')
+            .toLowerCase();
+        } else if (caseType === 'slugify') {
+          newContext.lastOutput = input
+            .toLowerCase()
+            .trim()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/[\s_-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        } else if (caseType === 'trim') {
+          newContext.lastOutput = input.trim();
+        } else {
+          newContext.lastOutput = input;
+        }
+      }
+
+      newContext[nodeId] = newContext.lastOutput;
+    } catch (err: any) {
+      console.error('[Queue] Text Refinery Error:', err.message);
+      newContext.lastOutput = `Error (Text Refinery): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   }
   return true;
   // End of runLogic

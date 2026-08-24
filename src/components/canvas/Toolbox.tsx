@@ -38,6 +38,7 @@ const toolItems: ToolItem[] = [
   { type: 'checkpoint',     name: 'Checkpoint',       icon: 'pan_tool', description: 'Human in the Loop',        longDescription: 'Pause the workflow and wait for manual human approval before continuing. You can approve or reject the payload.', color: '#eab308', asset: 'checkpoint.png' },
   { type: 'github',         name: 'Version Control',  icon: 'code', description: 'GitHub API',               longDescription: 'Interact with GitHub repositories via the REST API. Fetch files, search issues, create issues, or post comments directly to GitHub.', color: '#10b981', asset: 'github.png' },
   { type: 'sawmill',        name: 'Sawmill',          icon: 'content_cut', description: 'Text Chunker',             longDescription: 'Splits long text into overlapping chunks for RAG pipelines. Outputs a JSON array of strings.', color: '#d97706', asset: 'sawmill.png' },
+  { type: 'textRefinery',   name: 'Text Refinery',    icon: 'filter_alt',   description: 'Regex & Text Transform',   longDescription: 'Extract regex patterns, perform search & replace, sanitize characters, or transform string casing without writing code.', color: '#06b6d4', asset: 'text_refinery.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

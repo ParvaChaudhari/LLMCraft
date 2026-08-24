@@ -49,6 +49,7 @@ import AirportNode from './nodes/AirportNode';
 import CheckpointNode from './nodes/CheckpointNode';
 import GithubNode from './nodes/GithubNode';
 import SawmillNode from './nodes/SawmillNode';
+import TextRefineryNode from './nodes/TextRefineryNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -86,6 +87,7 @@ const nodeTypes = {
   checkpoint: CheckpointNode,
   github: GithubNode,
   sawmill: SawmillNode,
+  textRefinery: TextRefineryNode,
 };
 
 const edgeTypes = {
