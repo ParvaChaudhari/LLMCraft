@@ -552,9 +552,13 @@ export default function SidePanel({
         setS3SecretKey('');
         setS3Region('us-east-1');
         setS3Endpoint('');
+      } else if (newCred.error) {
+        console.error('[Create Credential Error]', newCred.error);
+        alert(`Failed to save credential: ${newCred.error}`);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      alert(`Error saving credential: ${e.message}`);
     } finally {
       setIsSavingCred(false);
     }
@@ -1303,12 +1307,20 @@ export default function SidePanel({
                                     />
                                   </div>
                                   <button
-                                    onClick={handleCreateCredential}
-                                    disabled={!newCredName || !newCredKey || isSavingCred}
-                                    className="w-full bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)] font-bold py-2 px-4 uppercase tracking-wider tactile-button disabled:opacity-50"
-                                  >
-                                    {isSavingCred ? 'Saving...' : 'Save & Select'}
-                                  </button>
+                                  onClick={handleCreateCredential}
+                                  disabled={
+                                    !newCredName ||
+                                    (getCredentialProvider(selectedNode.type) === 'google_drive'
+                                      ? !(gDriveClientId && gDriveClientSecret && gDriveRefreshToken)
+                                      : getCredentialProvider(selectedNode.type) === 's3'
+                                      ? !(s3AccessKey && s3SecretKey)
+                                      : !newCredKey) ||
+                                    isSavingCred
+                                  }
+                                  className="w-full bg-[var(--color-tertiary-fixed)] hover:bg-[#5ae658] text-[var(--color-on-background)] font-bold py-2 px-4 uppercase tracking-wider tactile-button disabled:opacity-50"
+                                >
+                                  {isSavingCred ? 'Saving...' : 'Save & Select'}
+                                </button>
                                 </div>
                               )}
                             </div>
