@@ -1385,6 +1385,9 @@ const executeNode = async (job: Job) => {
       newContext.lastOutput = `Error (Text Refinery): ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
     }
+  } else if (currentNode.type === 'billboard') {
+    // Passive annotation node — pass through lastOutput unchanged
+    newContext[nodeId] = newContext.lastOutput;
   }
   return true;
   // End of runLogic
@@ -1396,7 +1399,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint', 'sawmill'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint', 'sawmill', 'billboard'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {

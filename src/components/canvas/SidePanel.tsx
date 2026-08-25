@@ -104,6 +104,7 @@ const toolAssets: Record<string, string> = {
   github: 'github.png',
   sawmill: 'sawmill.png',
   textRefinery: 'text_refinery.png',
+  billboard: 'billboard.png',
 };
 
 export default function SidePanel({
@@ -1960,6 +1961,72 @@ export default function SidePanel({
                             </select>
                           </div>
                         )}
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'billboard' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Signboard Headline</label>
+                          <input
+                            type="text"
+                            value={data.title !== undefined ? data.title : 'NOTE'}
+                            onChange={(e) => handleChange('title', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2.5 inset-input outline-none font-[family-name:var(--font-label-caps)] text-sm font-bold uppercase tracking-wider"
+                            placeholder="e.g. INGESTION PIPELINE"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Signboard Message / Documentation</label>
+                          <textarea
+                            value={data.content !== undefined ? data.content : ''}
+                            onChange={(e) => handleChange('content', e.target.value)}
+                            className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2.5 inset-input resize-y outline-none"
+                            placeholder="Type documentation, instructions, or pipeline notes..."
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Color & Visual Theme</label>
+                          <select
+                            value={data.theme || 'classic'}
+                            onChange={(e) => handleChange('theme', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="classic">Classic Cream & Charcoal</option>
+                            <option value="cyber">Cyber Neon Cyan</option>
+                            <option value="amber">Amber Highway Matrix</option>
+                            <option value="hazard">Construction Hazard Yellow</option>
+                          </select>
+                        </div>
+
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Font Size</label>
+                            <select
+                              value={data.fontSize || 'md'}
+                              onChange={(e) => handleChange('fontSize', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                            >
+                              <option value="sm">Small</option>
+                              <option value="md">Medium</option>
+                              <option value="lg">Large</option>
+                            </select>
+                          </div>
+
+                          <div className="flex-1">
+                            <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Alignment</label>
+                            <select
+                              value={data.align || 'center'}
+                              onChange={(e) => handleChange('align', e.target.value)}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                            >
+                              <option value="center">Center</option>
+                              <option value="left">Left</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>
