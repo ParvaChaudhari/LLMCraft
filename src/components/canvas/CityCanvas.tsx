@@ -51,6 +51,7 @@ import GithubNode from './nodes/GithubNode';
 import SawmillNode from './nodes/SawmillNode';
 import TextRefineryNode from './nodes/TextRefineryNode';
 import BillboardNode from './nodes/BillboardNode';
+import ObjectStorageNode from './nodes/ObjectStorageNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -90,6 +91,7 @@ const nodeTypes = {
   sawmill: SawmillNode,
   textRefinery: TextRefineryNode,
   billboard: BillboardNode,
+  objectStorage: ObjectStorageNode,
 };
 
 const edgeTypes = {

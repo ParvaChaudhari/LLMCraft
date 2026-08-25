@@ -24,6 +24,7 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'postOffice') return 'resend';
   if (nodeType === 'googleDrive') return 'google_drive';
   if (nodeType === 'github') return 'github';
+  if (nodeType === 'objectStorage') return 's3';
   return null;
 };
 
@@ -105,6 +106,7 @@ const toolAssets: Record<string, string> = {
   sawmill: 'sawmill.png',
   textRefinery: 'text_refinery.png',
   billboard: 'billboard.png',
+  objectStorage: 'object_storage.png',
 };
 
 export default function SidePanel({
@@ -143,6 +145,11 @@ export default function SidePanel({
   const [gDriveClientId, setGDriveClientId] = useState('');
   const [gDriveClientSecret, setGDriveClientSecret] = useState('');
   const [gDriveRefreshToken, setGDriveRefreshToken] = useState('');
+
+  const [s3AccessKey, setS3AccessKey] = useState('');
+  const [s3SecretKey, setS3SecretKey] = useState('');
+  const [s3Region, setS3Region] = useState('us-east-1');
+  const [s3Endpoint, setS3Endpoint] = useState('');
 
   const [embeddingCredentials, setEmbeddingCredentials] = useState<any[]>([]);
 
@@ -511,6 +518,13 @@ export default function SidePanel({
         client_secret: gDriveClientSecret,
         refresh_token: gDriveRefreshToken
       });
+    } else if (credType === 's3') {
+      finalKey = JSON.stringify({
+        access_key_id: s3AccessKey,
+        secret_access_key: s3SecretKey,
+        region: s3Region || 'us-east-1',
+        endpoint: s3Endpoint || undefined,
+      });
     }
 
     if (!newCredName || !finalKey) return;
@@ -534,6 +548,10 @@ export default function SidePanel({
         setGDriveClientId('');
         setGDriveClientSecret('');
         setGDriveRefreshToken('');
+        setS3AccessKey('');
+        setS3SecretKey('');
+        setS3Region('us-east-1');
+        setS3Endpoint('');
       }
     } catch (e) {
       console.error(e);
@@ -648,7 +666,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery', 'objectStorage'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -748,11 +766,11 @@ export default function SidePanel({
                     <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault', 'googleDrive'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault', 'googleDrive', 'objectStorage'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">
-                            {selectedNode.type === 'bankVault' ? 'Database Credential (Postgres)' : 'Authentication Credential'}
+                            {selectedNode.type === 'bankVault' ? 'Database Credential (Postgres)' : selectedNode.type === 'objectStorage' ? 'S3 / R2 Authentication Credential' : 'Authentication Credential'}
                           </label>
                           <div className="flex gap-2">
                             <select
@@ -790,7 +808,7 @@ export default function SidePanel({
                               </div>
                               <div>
                                 <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-1 text-[var(--color-inverse-primary)]">
-                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : getCredentialProvider(selectedNode.type) === 'google_drive' ? 'OAuth JSON (Client & Token)' : 'API Key'}
+                                  {getCredentialProvider(selectedNode.type) === 'postgres' ? 'Connection String' : getCredentialProvider(selectedNode.type) === 'google_drive' ? 'OAuth JSON (Client & Token)' : getCredentialProvider(selectedNode.type) === 's3' ? 'S3 / R2 Keys & Endpoint' : 'API Key'}
                                 </label>
                                 {getCredentialProvider(selectedNode.type) === 'google_drive' ? (
                                   <div className="space-y-2">
@@ -818,6 +836,41 @@ export default function SidePanel({
                                       autoComplete="new-password"
                                       className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                                     />
+                                  </div>
+                                ) : getCredentialProvider(selectedNode.type) === 's3' ? (
+                                  <div className="space-y-2">
+                                    <input
+                                      type="text"
+                                      value={s3AccessKey}
+                                      onChange={(e) => setS3AccessKey(e.target.value)}
+                                      placeholder="Access Key ID (e.g. AKIA... or R2 token)"
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                    <input
+                                      type="password"
+                                      value={s3SecretKey}
+                                      onChange={(e) => setS3SecretKey(e.target.value)}
+                                      placeholder="Secret Access Key"
+                                      autoComplete="new-password"
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                    />
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="text"
+                                        value={s3Region}
+                                        onChange={(e) => setS3Region(e.target.value)}
+                                        placeholder="Region (e.g. us-east-1, auto)"
+                                        className="w-1/3 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={s3Endpoint}
+                                        onChange={(e) => setS3Endpoint(e.target.value)}
+                                        placeholder="Endpoint URL (Optional for R2/MinIO)"
+                                        className="w-2/3 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                      />
+                                    </div>
                                   </div>
                                 ) : (
                                   <input
@@ -2027,6 +2080,73 @@ export default function SidePanel({
                             </select>
                           </div>
                         </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'objectStorage' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Bucket Action</label>
+                          <select
+                            value={data.action || 'upload_object'}
+                            onChange={(e) => handleChange('action', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="upload_object">Upload Object / File</option>
+                            <option value="read_object">Read / Download Object</option>
+                            <option value="list_objects">List Objects in Bucket</option>
+                            <option value="delete_object">Delete Object</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Bucket Name</label>
+                          <input
+                            type="text"
+                            value={data.bucketName || ''}
+                            onChange={(e) => handleChange('bucketName', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="e.g. my-app-production-bucket"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">
+                            {data.action === 'list_objects' ? 'Prefix / Folder Path (Optional)' : 'Object Key / Path'}
+                          </label>
+                          <input
+                            type="text"
+                            value={data.objectKey !== undefined ? data.objectKey : ''}
+                            onChange={(e) => handleChange('objectKey', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder={data.action === 'list_objects' ? "e.g. images/ or exports/" : "e.g. data/results.json or images/{{filename}}.png"}
+                          />
+                        </div>
+
+                        {(data.action === 'upload_object' || !data.action) && (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Payload / Body Content</label>
+                              <textarea
+                                value={data.body !== undefined ? data.body : '{{lastOutput}}'}
+                                onChange={(e) => handleChange('body', e.target.value)}
+                                className="w-full h-24 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder="{{lastOutput}} or custom data to upload..."
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Content-Type</label>
+                              <input
+                                type="text"
+                                value={data.contentType || 'application/json'}
+                                onChange={(e) => handleChange('contentType', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="e.g. application/json, text/plain, image/png, auto"
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

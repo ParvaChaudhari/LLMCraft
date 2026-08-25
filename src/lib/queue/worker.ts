@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
 import { Pool } from 'pg';
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectCommand } from '@aws-sdk/client-s3';
 // pdf-parse must be required (not imported) to avoid its test-file side-effects at startup
 const pdfParse = require('pdf-parse/lib/pdf-parse.js') as (buf: Buffer) => Promise<{ text: string }>;
 
@@ -1388,6 +1389,144 @@ const executeNode = async (job: Job) => {
   } else if (currentNode.type === 'billboard') {
     // Passive annotation node — pass through lastOutput unchanged
     newContext[nodeId] = newContext.lastOutput;
+  } else if (currentNode.type === 'objectStorage') {
+    const action = currentNode.data?.action || 'upload_object';
+    let rawBucket = currentNode.data?.bucketName || '';
+    let rawKey = currentNode.data?.objectKey || '';
+    let rawBody = currentNode.data?.body !== undefined ? currentNode.data.body : '{{lastOutput}}';
+    const contentType = currentNode.data?.contentType || 'application/json';
+
+    // Resolve variables
+    const bucketName = replaceVariables(rawBucket, newContext).trim();
+    const objectKey = replaceVariables(rawKey, newContext).trim();
+    const bodyContent = replaceVariables(rawBody, newContext);
+
+    // Resolve credentials
+    let accessKeyId = '';
+    let secretAccessKey = '';
+    let region = 'us-east-1';
+    let endpoint: string | undefined = undefined;
+
+    const credentialId = currentNode.data?.credentialId;
+    const decryptedKey = credentialId ? await fetchApiKey(credentialId) : null;
+
+    if (decryptedKey) {
+      try {
+        const parsed = JSON.parse(decryptedKey);
+        accessKeyId = parsed.access_key_id || '';
+        secretAccessKey = parsed.secret_access_key || '';
+        region = parsed.region || 'us-east-1';
+        endpoint = parsed.endpoint || undefined;
+      } catch (_) {
+        accessKeyId = decryptedKey;
+      }
+    } else {
+      accessKeyId = currentNode.data?.accessKeyId || process.env.AWS_ACCESS_KEY_ID || '';
+      secretAccessKey = currentNode.data?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY || '';
+      region = currentNode.data?.region || process.env.AWS_REGION || 'us-east-1';
+      endpoint = currentNode.data?.endpoint || process.env.AWS_ENDPOINT_URL || undefined;
+    }
+
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('Missing S3 / R2 credentials. Please attach an S3 credential to the Object Storage node.');
+    }
+
+    if (!bucketName) {
+      throw new Error('Bucket name is required for Object Storage operations.');
+    }
+
+    const s3 = new S3Client({
+      region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+      endpoint: endpoint || undefined,
+      forcePathStyle: !!endpoint, // Required for MinIO / custom S3 endpoints
+    });
+
+    try {
+      if (action === 'upload_object') {
+        if (!objectKey) throw new Error('Object key / path is required for upload.');
+        console.log(`[Queue] Object Storage uploading to s3://${bucketName}/${objectKey}`);
+
+        await s3.send(new PutObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+          Body: bodyContent,
+          ContentType: contentType,
+        }));
+
+        const result = {
+          success: true,
+          action: 'upload_object',
+          bucket: bucketName,
+          key: objectKey,
+          size: Buffer.byteLength(bodyContent, 'utf-8'),
+          s3Uri: `s3://${bucketName}/${objectKey}`,
+          url: endpoint ? `${endpoint.replace(/\/$/, '')}/${bucketName}/${objectKey}` : `https://${bucketName}.s3.${region}.amazonaws.com/${objectKey}`
+        };
+
+        newContext.lastOutput = JSON.stringify(result, null, 2);
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Object Storage successfully uploaded s3://${bucketName}/${objectKey}`);
+      } else if (action === 'read_object') {
+        if (!objectKey) throw new Error('Object key / path is required for read.');
+        console.log(`[Queue] Object Storage reading s3://${bucketName}/${objectKey}`);
+
+        const response = await s3.send(new GetObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+        }));
+
+        const fileContent = await response.Body?.transformToString();
+        newContext.lastOutput = fileContent ?? '';
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Object Storage fetched ${fileContent?.length ?? 0} characters from s3://${bucketName}/${objectKey}`);
+      } else if (action === 'list_objects') {
+        console.log(`[Queue] Object Storage listing objects in s3://${bucketName} (prefix: "${objectKey}")`);
+
+        const response = await s3.send(new ListObjectsV2Command({
+          Bucket: bucketName,
+          Prefix: objectKey || undefined,
+          MaxKeys: 100,
+        }));
+
+        const items = (response.Contents || []).map(item => ({
+          key: item.Key,
+          size: item.Size,
+          lastModified: item.LastModified?.toISOString(),
+          etag: item.ETag,
+        }));
+
+        newContext.lastOutput = JSON.stringify(items, null, 2);
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Object Storage listed ${items.length} object(s).`);
+      } else if (action === 'delete_object') {
+        if (!objectKey) throw new Error('Object key / path is required for deletion.');
+        console.log(`[Queue] Object Storage deleting s3://${bucketName}/${objectKey}`);
+
+        await s3.send(new DeleteObjectCommand({
+          Bucket: bucketName,
+          Key: objectKey,
+        }));
+
+        const result = {
+          success: true,
+          action: 'delete_object',
+          bucket: bucketName,
+          deletedKey: objectKey,
+        };
+
+        newContext.lastOutput = JSON.stringify(result, null, 2);
+        newContext[nodeId] = newContext.lastOutput;
+        console.log(`[Queue] Object Storage deleted s3://${bucketName}/${objectKey}`);
+      }
+    } catch (err: any) {
+      console.error('[Queue] Object Storage Error:', err.message);
+      newContext.lastOutput = `Error (Object Storage): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   }
   return true;
   // End of runLogic
