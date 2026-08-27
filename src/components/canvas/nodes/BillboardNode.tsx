@@ -12,7 +12,7 @@ interface BillboardData {
 
 export default function BillboardNode({ id, data, selected }: { id: string; data: BillboardData; selected?: boolean }) {
   const title = data?.title || 'NOTE';
-  const content = data?.content || 'Double-click or edit in SidePanel';
+  const content = data?.content || 'Edit message in SidePanel';
   const theme = data?.theme || 'classic';
   const align = data?.align || 'center';
   const fontSize = data?.fontSize || 'md';

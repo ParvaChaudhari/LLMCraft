@@ -41,6 +41,7 @@ const toolItems: ToolItem[] = [
   { type: 'textRefinery',   name: 'Text Refinery',    icon: 'filter_alt',   description: 'Regex & Text Transform',   longDescription: 'Extract regex patterns, perform search & replace, sanitize characters, or transform string casing without writing code.', color: '#06b6d4', asset: 'text_refinery.png' },
   { type: 'billboard',      name: 'Billboard',        icon: 'signpost',     description: 'Note & Annotation',         longDescription: 'Place customizable notes, pipeline headers, and workflow documentation directly onto the city canvas.', color: '#eab308', asset: 'billboard.png' },
   { type: 'objectStorage',  name: 'Object Storage',   icon: 'cloud_upload', description: 'S3 / R2 / MinIO Buckets',   longDescription: 'Store, retrieve, list, or delete files, images, and documents in AWS S3, Cloudflare R2, MinIO, or Supabase Storage buckets.', color: '#0284c7', asset: 'object_storage.png' },
+  { type: 'audioStudio',    name: 'Audio Studio',     icon: 'mic',          description: 'Gemini Voice Synthesis',    longDescription: 'Transcribe audio recordings or synthesize high-quality spoken voices using Google Gemini 3.6 Flash native audio generation.', color: '#d946ef', asset: 'recording_studio.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

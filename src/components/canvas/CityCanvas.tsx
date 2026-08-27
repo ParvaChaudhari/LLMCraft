@@ -52,6 +52,7 @@ import SawmillNode from './nodes/SawmillNode';
 import TextRefineryNode from './nodes/TextRefineryNode';
 import BillboardNode from './nodes/BillboardNode';
 import ObjectStorageNode from './nodes/ObjectStorageNode';
+import RecordingStudioNode from './nodes/RecordingStudioNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
@@ -92,6 +93,7 @@ const nodeTypes = {
   textRefinery: TextRefineryNode,
   billboard: BillboardNode,
   objectStorage: ObjectStorageNode,
+  audioStudio: RecordingStudioNode,
 };
 
 const edgeTypes = {

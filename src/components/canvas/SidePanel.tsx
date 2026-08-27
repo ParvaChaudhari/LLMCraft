@@ -14,7 +14,7 @@ const isFresh = <T,>(entry: CacheEntry<T> | undefined): entry is CacheEntry<T> =
 
 const LLM_NODE_TYPES = ['geminiFactory', 'chatgptFactory', 'claudeFactory'];
 
-const getCredentialProvider = (nodeType: string): string | null => {
+const getCredentialProvider = (nodeType: string, nodeData?: any): string | null => {
   if (nodeType === 'geminiFactory') return 'gemini';
   if (nodeType === 'chatgptFactory') return 'openai';
   if (nodeType === 'claudeFactory') return 'anthropic';
@@ -25,6 +25,9 @@ const getCredentialProvider = (nodeType: string): string | null => {
   if (nodeType === 'googleDrive') return 'google_drive';
   if (nodeType === 'github') return 'github';
   if (nodeType === 'objectStorage') return 's3';
+  if (nodeType === 'audioStudio') {
+    return 'gemini';
+  }
   return null;
 };
 
@@ -107,6 +110,7 @@ const toolAssets: Record<string, string> = {
   textRefinery: 'text_refinery.png',
   billboard: 'billboard.png',
   objectStorage: 'object_storage.png',
+  audioStudio: 'recording_studio.png',
 };
 
 export default function SidePanel({
@@ -243,7 +247,7 @@ export default function SidePanel({
 
   // Fetch credentials when a node that needs them is selected
   useEffect(() => {
-    const credType = getCredentialProvider(selectedNode?.type);
+    const credType = getCredentialProvider(selectedNode?.type, selectedNode?.data);
 
     if (credType) {
       // Serve fresh cached data immediately to avoid flicker
@@ -260,7 +264,7 @@ export default function SidePanel({
         })
         .catch(err => console.error("Failed to fetch credentials:", err));
     }
-  }, [selectedNode?.type]);
+  }, [selectedNode?.type, selectedNode?.data?.provider]);
 
   // Fetch embedding credentials specifically for Bank Vault
   useEffect(() => {
@@ -509,7 +513,7 @@ export default function SidePanel({
   };
 
   const handleCreateCredential = async () => {
-    const credType = getCredentialProvider(selectedNode.type);
+    const credType = getCredentialProvider(selectedNode.type, selectedNode.data);
     
     let finalKey = newCredKey;
     if (credType === 'google_drive') {
@@ -670,7 +674,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery', 'objectStorage'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery', 'objectStorage', 'audioStudio'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -770,11 +774,17 @@ export default function SidePanel({
                     <h3 className="text-[var(--color-inverse-primary)] font-bold font-[family-name:var(--font-code-sm)] uppercase tracking-widest">Tasks</h3>
                   </div>
                   <div className="flex-1 p-4 overflow-y-auto space-y-6">
-                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault', 'googleDrive', 'objectStorage'].includes(selectedNode.type) && (
+                    {[...LLM_NODE_TYPES, 'watchtower', 'dbSilo', 'apify', 'bankVault', 'googleDrive', 'objectStorage', 'audioStudio'].includes(selectedNode.type) && (
                       <>
                         <div>
                           <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">
-                            {selectedNode.type === 'bankVault' ? 'Database Credential (Postgres)' : selectedNode.type === 'objectStorage' ? 'S3 / R2 Authentication Credential' : 'Authentication Credential'}
+                            {selectedNode.type === 'bankVault'
+                              ? 'Database Credential (Postgres)'
+                              : selectedNode.type === 'objectStorage'
+                              ? 'S3 / R2 Authentication Credential'
+                              : selectedNode.type === 'audioStudio'
+                              ? (data.provider === 'openai' ? 'OpenAI API Credential' : 'Google / Gemini API Credential')
+                              : 'Authentication Credential'}
                           </label>
                           <div className="flex gap-2">
                             <select
@@ -1310,9 +1320,9 @@ export default function SidePanel({
                                   onClick={handleCreateCredential}
                                   disabled={
                                     !newCredName ||
-                                    (getCredentialProvider(selectedNode.type) === 'google_drive'
+                                    (getCredentialProvider(selectedNode.type, selectedNode.data) === 'google_drive'
                                       ? !(gDriveClientId && gDriveClientSecret && gDriveRefreshToken)
-                                      : getCredentialProvider(selectedNode.type) === 's3'
+                                      : getCredentialProvider(selectedNode.type, selectedNode.data) === 's3'
                                       ? !(s3AccessKey && s3SecretKey)
                                       : !newCredKey) ||
                                     isSavingCred
@@ -2161,6 +2171,76 @@ export default function SidePanel({
                         )}
                       </div>
                     )}
+
+                    {selectedNode.type === 'audioStudio' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Studio Operation</label>
+                          <select
+                            value={data.mode || 'text_to_speech'}
+                            onChange={(e) => handleChange('mode', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="text_to_speech">Text-to-Speech (Generate Voice Audio)</option>
+                            <option value="speech_to_text">Speech-to-Text (Transcribe Audio)</option>
+                          </select>
+                        </div>
+
+                        {(data.mode === 'text_to_speech' || !data.mode) ? (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Gemini Voice</label>
+                              <select
+                                value={data.voice || 'Kore'}
+                                onChange={(e) => handleChange('voice', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                              >
+                                <option value="Kore">Kore (Clear / Soothing Female)</option>
+                                <option value="Leda">Leda (Precise / Articulate Female)</option>
+                                <option value="Orus">Orus (Warm / Narrative Male)</option>
+                                <option value="Charon">Charon (Deep / Authoritative Male)</option>
+                                <option value="Puck">Puck (Energetic / Natural Male)</option>
+                                <option value="Fenrir">Fenrir (Bold / Resonant Male)</option>
+                                <option value="Aoede">Aoede (Expressive / Warm Female)</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Text Script to Synthesize</label>
+                              <textarea
+                                value={data.text !== undefined ? data.text : '{{lastOutput}}'}
+                                onChange={(e) => handleChange('text', e.target.value)}
+                                className="w-full h-28 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2.5 inset-input resize-y outline-none"
+                                placeholder="{{lastOutput}} or type the text to speak..."
+                              />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Audio Source (URL, S3 Link, or Base64 Audio)</label>
+                              <textarea
+                                value={data.audioSource !== undefined ? data.audioSource : '{{lastOutput}}'}
+                                onChange={(e) => handleChange('audioSource', e.target.value)}
+                                className="w-full h-24 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2.5 inset-input resize-y outline-none"
+                                placeholder="{{lastOutput}} or https://example.com/audio.mp3"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Language (Optional ISO code, e.g. en, es, fr)</label>
+                              <input
+                                type="text"
+                                value={data.language || ''}
+                                onChange={(e) => handleChange('language', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Leave blank for automatic detection"
+                              />
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -2233,6 +2313,21 @@ export default function SidePanel({
                             return (
                               <div className="flex-1 w-full overflow-y-auto flex flex-col items-center custom-scrollbar">
                                 <img src={imgUrl} alt="Generated" className="max-w-full rounded-md border-[4px] border-[#2d2d2d]" />
+                              </div>
+                            );
+                          })() : (data.output.startsWith('data:audio/') || data.output.includes('[AUDIO GENERATED]')) ? (() => {
+                            let audioSrc = data.output;
+                            const match = data.output.match(/Data:\s*(data:audio\/[^\s]+)/);
+                            if (match) audioSrc = match[1].trim();
+                            return (
+                              <div className="flex-1 w-full overflow-y-auto flex flex-col items-center justify-center p-2 custom-scrollbar">
+                                <div className="p-4 bg-white border border-gray-200 rounded-lg shadow-sm w-full flex flex-col items-center gap-3">
+                                  <div className="flex items-center gap-2 text-fuchsia-600 font-bold text-xs uppercase tracking-wider">
+                                    <span className="material-symbols-outlined text-[20px]">graphic_eq</span>
+                                    <span>Synthesized Audio</span>
+                                  </div>
+                                  <audio controls src={audioSrc} className="w-full" autoPlay={false} />
+                                </div>
                               </div>
                             );
                           })() : (

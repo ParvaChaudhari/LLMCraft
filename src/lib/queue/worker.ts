@@ -1527,6 +1527,289 @@ const executeNode = async (job: Job) => {
       newContext.lastOutput = `Error (Object Storage): ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
     }
+  } else if (currentNode.type === 'audioStudio') {
+    const provider = currentNode.data?.provider || 'google';
+    const mode = currentNode.data?.mode || 'text_to_speech';
+    const credentialId = currentNode.data?.credentialId;
+
+    let apiKey = credentialId ? await fetchApiKey(credentialId) : null;
+    if (!apiKey) {
+      if (provider === 'google') {
+        apiKey = process.env.GEMINI_API_KEY || null;
+      } else {
+        apiKey = process.env.OPENAI_API_KEY || null;
+      }
+    }
+
+    if (!apiKey) {
+      const providerLabel = provider === 'google' ? 'Google / Gemini' : 'OpenAI';
+      throw new Error(`Missing ${providerLabel} API Key for Audio Studio. Please select or create a credential.`);
+    }
+
+    console.log(`[Queue] Audio Studio using API key: ${apiKey.slice(0, 8)}...${apiKey.slice(-4)} (len: ${apiKey.length})`);
+
+    try {
+      if (mode === 'text_to_speech') {
+        const rawText = currentNode.data?.text !== undefined ? currentNode.data.text : '{{lastOutput}}';
+        const text = replaceVariables(rawText, newContext) || 'Hello from LLMCraft Audio Studio.';
+        const speed = parseFloat(currentNode.data?.speed) || 1.0;
+
+        if (provider === 'google') {
+          const rawVoice = currentNode.data?.voice || 'Kore';
+          // Voices confirmed supported by gemini-2.5-flash-preview-tts
+          const supportedVoices = ['Kore', 'Leda', 'Orus', 'Charon', 'Puck', 'Fenrir', 'Aoede'];
+          const selectedVoice = supportedVoices.includes(rawVoice) ? rawVoice : 'Kore';
+          console.log(`[Queue] Using TTS voice: ${selectedVoice}`);
+
+          console.log(`[Queue] Audio Studio synthesizing speech with Gemini TTS (Voice: ${selectedVoice}): "${text.slice(0, 80)}..."`);
+
+          // Helper: wrap raw PCM bytes in a WAV file header so browsers can play it
+          // Gemini TTS returns audio/pcm at 24kHz, 16-bit, mono
+          const pcmToWavDataUri = (base64Pcm: string): string => {
+            const pcmBytes = Buffer.from(base64Pcm, 'base64');
+            const sampleRate = 24000;
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            const wavHeader = Buffer.alloc(44);
+            wavHeader.write('RIFF', 0);
+            wavHeader.writeUInt32LE(36 + pcmBytes.length, 4);
+            wavHeader.write('WAVE', 8);
+            wavHeader.write('fmt ', 12);
+            wavHeader.writeUInt32LE(16, 16);           // PCM chunk size
+            wavHeader.writeUInt16LE(1, 20);            // PCM format
+            wavHeader.writeUInt16LE(numChannels, 22);
+            wavHeader.writeUInt32LE(sampleRate, 24);
+            wavHeader.writeUInt32LE(byteRate, 28);
+            wavHeader.writeUInt16LE(blockAlign, 32);
+            wavHeader.writeUInt16LE(bitsPerSample, 34);
+            wavHeader.write('data', 36);
+            wavHeader.writeUInt32LE(pcmBytes.length, 40);
+            const wavBuffer = Buffer.concat([wavHeader, pcmBytes]);
+            return `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+          };
+
+          // Ensure the input text has a clear reading directive so the LLM doesn't mistake it for a chat prompt
+          const cleanText = text.trim();
+          const speechPrompt = /^(read|speak|say|narrate)\b/i.test(cleanText)
+            ? cleanText
+            : `Read aloud: ${cleanText}`;
+
+          // TTS request body — NO role field, lowercase 'audio' (confirmed by live API test)
+          const ttsRequestBody = JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: speechPrompt }]
+              }
+            ],
+            generationConfig: {
+              responseModalities: ['audio'],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: {
+                    voiceName: selectedVoice
+                  }
+                }
+              }
+            }
+          });
+
+          const ttsModels = ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'];
+          let audioDataUri: string | null = null;
+          let lastError: string = '';
+
+          // Log exact body for debugging
+          console.log(`[Queue] TTS request body: ${ttsRequestBody.slice(0, 500)}`);
+
+          for (const ttsModel of ttsModels) {
+            console.log(`[Queue] Trying TTS model: ${ttsModel}...`);
+            const res = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/models/${ttsModel}:generateContent?key=${apiKey}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: ttsRequestBody,
+                cache: 'no-store' as any,
+              }
+            );
+
+            const rawData = await res.json().catch(() => ({}));
+
+            console.log(`[Queue] ${ttsModel} HTTP ${res.status}, raw response: ${JSON.stringify(rawData).slice(0, 500)}`);
+
+            if (!res.ok) {
+              lastError = rawData.error?.message || `HTTP ${res.status}`;
+              console.log(`[Queue] ${ttsModel} error: ${lastError}`);
+              // Retry on model-not-found errors, stop on quota/auth errors
+              if (res.status !== 404 && !lastError.toLowerCase().includes('not found') && !lastError.toLowerCase().includes('not supported')) {
+                break;
+              }
+              continue;
+            }
+
+            // Log raw response structure for debugging
+            const parts = rawData.candidates?.[0]?.content?.parts || [];
+            console.log(`[Queue] ${ttsModel} response parts: ${JSON.stringify(parts.map((p: any) => ({ hasInlineData: !!p.inlineData, mimeType: p.inlineData?.mimeType, textLen: p.text?.length })))}`);
+
+            const audioPart = parts.find((p: any) => p.inlineData?.data);
+            if (audioPart?.inlineData?.data) {
+              const mimeType = audioPart.inlineData.mimeType || '';
+              if (mimeType.includes('pcm') || mimeType === '') {
+                // Raw PCM — wrap in WAV header
+                console.log(`[Queue] Converting raw PCM (${mimeType}) to WAV...`);
+                audioDataUri = pcmToWavDataUri(audioPart.inlineData.data);
+              } else {
+                audioDataUri = `data:${mimeType};base64,${audioPart.inlineData.data}`;
+              }
+              console.log(`[Queue] Audio Studio generated audio via ${ttsModel} (${mimeType || 'pcm→wav'}).`);
+              break;
+            }
+
+            lastError = `${ttsModel} returned no audio part. Full response: ${JSON.stringify(rawData).slice(0, 300)}`;
+            console.log(`[Queue] ${lastError}`);
+          }
+
+          if (audioDataUri) {
+            newContext.lastOutput = audioDataUri;
+            newContext[nodeId] = newContext.lastOutput;
+            return true;
+          }
+
+          throw new Error(`Gemini TTS failed: ${lastError}`);
+
+        } else {
+          // OpenAI TTS
+          const model = currentNode.data?.model || 'tts-1';
+          const voice = currentNode.data?.voice || 'nova';
+
+          console.log(`[Queue] Audio Studio synthesizing text with OpenAI "${voice}" (${model}): "${text.slice(0, 60)}..."`);
+
+          const res = await fetch('https://api.openai.com/v1/audio/speech', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model,
+              voice,
+              input: text,
+              speed,
+              response_format: 'mp3',
+            }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `OpenAI TTS error (Status: ${res.status})`);
+          }
+
+          const arrayBuffer = await res.arrayBuffer();
+          const base64Audio = Buffer.from(arrayBuffer).toString('base64');
+          const dataUri = `data:audio/mp3;base64,${base64Audio}`;
+
+          newContext.lastOutput = dataUri;
+          newContext[nodeId] = newContext.lastOutput;
+          console.log(`[Queue] Audio Studio generated ${Math.round(base64Audio.length / 1024)} KB audio via OpenAI.`);
+        }
+      } else if (mode === 'speech_to_text') {
+        const rawAudio = currentNode.data?.audioSource !== undefined ? currentNode.data.audioSource : '{{lastOutput}}';
+        const audioSource = replaceVariables(rawAudio, newContext).trim();
+        const language = currentNode.data?.language?.trim() || undefined;
+
+        if (!audioSource) {
+          throw new Error('No audio URL or audio data provided for transcription.');
+        }
+
+        console.log(`[Queue] Audio Studio preparing audio for transcription (${provider})...`);
+
+        let audioBuffer: Buffer;
+        let mimeType = 'audio/mp3';
+        let filename = 'audio.mp3';
+
+        if (audioSource.startsWith('data:')) {
+          const matches = audioSource.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches) {
+            mimeType = matches[1];
+            audioBuffer = Buffer.from(matches[2], 'base64');
+          } else {
+            audioBuffer = Buffer.from(audioSource, 'base64');
+          }
+        } else if (audioSource.startsWith('http://') || audioSource.startsWith('https://')) {
+          const audioRes = await fetch(audioSource);
+          if (!audioRes.ok) throw new Error(`Failed to download audio from ${audioSource} (Status: ${audioRes.status})`);
+          const arrayBuffer = await audioRes.arrayBuffer();
+          audioBuffer = Buffer.from(arrayBuffer);
+          const urlExt = path.extname(new URL(audioSource).pathname).toLowerCase().replace('.', '');
+          if (urlExt) {
+            filename = `audio.${urlExt}`;
+            if (urlExt === 'wav') mimeType = 'audio/wav';
+            else if (urlExt === 'ogg') mimeType = 'audio/ogg';
+            else if (urlExt === 'm4a') mimeType = 'audio/m4a';
+          }
+        } else {
+          // Assume raw base64 string
+          audioBuffer = Buffer.from(audioSource, 'base64');
+        }
+
+        if (provider === 'google') {
+          console.log(`[Queue] Audio Studio transcribing audio with Gemini Multimodal Audio...`);
+          const genAI = new GoogleGenerativeAI(apiKey);
+          const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+          const prompt = language
+            ? `Please transcribe the attached audio file verbatim into text. The spoken language is ${language}. Return only the exact transcribed speech without introductory commentary.`
+            : `Please transcribe the attached audio file verbatim into text. Return only the exact transcribed speech without introductory commentary.`;
+
+          const result = await model.generateContent([
+            {
+              inlineData: {
+                mimeType,
+                data: audioBuffer.toString('base64'),
+              },
+            },
+            prompt,
+          ]);
+
+          const transcript = result.response.text().trim();
+          newContext.lastOutput = transcript;
+          newContext[nodeId] = newContext.lastOutput;
+          console.log(`[Queue] Audio Studio transcribed ${transcript.length} characters with Gemini.`);
+        } else {
+          console.log(`[Queue] Audio Studio transcribing audio with OpenAI Whisper...`);
+          const formData = new FormData();
+          const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
+          formData.append('file', blob, filename);
+          formData.append('model', 'whisper-1');
+          if (language) formData.append('language', language);
+
+          const whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: formData,
+          });
+
+          if (!whisperRes.ok) {
+            const errData = await whisperRes.json().catch(() => ({}));
+            throw new Error(errData.error?.message || `Whisper transcription error (Status: ${whisperRes.status})`);
+          }
+
+          const data = await whisperRes.json();
+          const transcript = data.text || '';
+
+          newContext.lastOutput = transcript;
+          newContext[nodeId] = newContext.lastOutput;
+          console.log(`[Queue] Audio Studio transcribed ${transcript.length} characters with Whisper.`);
+        }
+      }
+    } catch (err: any) {
+      console.error('[Queue] Audio Studio Error:', err.message);
+      newContext.lastOutput = `Error (Audio Studio): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   }
   return true;
   // End of runLogic
