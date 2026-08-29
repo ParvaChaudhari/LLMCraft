@@ -55,6 +55,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Build initial context from mockPayload if configured on the webhook node
+    let initialMock: any = {};
+    if (startNode.data?.mockPayload) {
+      try {
+        initialMock = JSON.parse(startNode.data.mockPayload);
+      } catch (_) {
+        initialMock = startNode.data.mockPayload;
+      }
+    }
+    const initialContext = {
+      webhook: initialMock,
+      body: initialMock,
+      lastOutput: typeof initialMock === 'string' ? initialMock : (Object.keys(initialMock).length > 0 ? JSON.stringify(initialMock) : ''),
+    };
+
     // Push the first job to the queue with a slight delay
     // This gives the client time to establish the SSE connection before events fire
     await workflowQueue.add('execute-node', {
@@ -62,7 +77,7 @@ export async function POST(req: NextRequest) {
       nodeId: startNode.id,
       nodes,
       edges,
-      context: {}
+      context: initialContext,
     }, { delay: 500 });
 
     return NextResponse.json({ message: "Workflow queued successfully!", workflowId: executionId });

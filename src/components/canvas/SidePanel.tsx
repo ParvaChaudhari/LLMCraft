@@ -111,6 +111,7 @@ const toolAssets: Record<string, string> = {
   billboard: 'billboard.png',
   objectStorage: 'object_storage.png',
   audioStudio: 'recording_studio.png',
+  webhookResponse: 'reply_tower.png',
 };
 
 export default function SidePanel({
@@ -166,6 +167,7 @@ export default function SidePanel({
   const nodeEventSourceRef = useRef<EventSource | null>(null);
   const terminalScrollRef = useRef<HTMLDivElement>(null);
   const [savedWorkflows, setSavedWorkflows] = useState<{id: string, name: string, graph_json?: any}[]>([]);
+  const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
 
   useEffect(() => {
     if (selectedNode?.type === 'airport') {
@@ -674,7 +676,7 @@ export default function SidePanel({
               <div>BUILDING ID: <span className="text-white">{selectedNode.type.toUpperCase()}-{selectedNode.id.split('_')[1]}</span></div>
 
               {/* Standalone Execute Button */}
-              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery', 'objectStorage', 'audioStudio'].includes(selectedNode.type) && (
+              {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'customWorkshop', 'webScraper', 'documentParser', 'dbSilo', 'jsonParser', 'apify', 'bankVault', 'artStudio', 'postOffice', 'googleDrive', 'variable', 'airport', 'github', 'sawmill', 'textRefinery', 'objectStorage', 'audioStudio', 'webhookResponse'].includes(selectedNode.type) && (
                 <button
                   onClick={executeNodeStandalone}
                   disabled={isNodeRunning}
@@ -2239,6 +2241,131 @@ export default function SidePanel({
                             </div>
                           </>
                         )}
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'webhook' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Execution & Response Mode</label>
+                          <select
+                            value={data.executionMode || 'async'}
+                            onChange={(e) => handleChange('executionMode', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="async">⚡ Asynchronous (Instant 200 Queue Receipt)</option>
+                            <option value="sync">🔄 Synchronous (Wait for Pipeline Response)</option>
+                          </select>
+                          <p className="text-[11px] text-[var(--color-on-surface-variant)] mt-1 font-[family-name:var(--font-code-sm)] leading-relaxed">
+                            {data.executionMode === 'sync'
+                              ? 'Holds the HTTP connection open up to 30s and returns the computed payload from a Reply Tower or final node.'
+                              : 'Immediately returns { workflowId, status: "queued" }. Best for background jobs or scrapers.'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Public Webhook URL</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              readOnly
+                              value={typeof window !== 'undefined' ? `${window.location.origin}/api/webhook/${window.location.pathname.split('/').pop()}` : '/api/webhook/:id'}
+                              className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] select-all"
+                            />
+                            <button
+                              onClick={() => {
+                                if (typeof window !== 'undefined') {
+                                  const url = `${window.location.origin}/api/webhook/${window.location.pathname.split('/').pop()}`;
+                                  navigator.clipboard.writeText(url);
+                                  setCopiedWebhookUrl(true);
+                                  setTimeout(() => setCopiedWebhookUrl(false), 2000);
+                                }
+                              }}
+                              className="bg-[var(--color-surface)] hover:bg-[var(--color-surface)] text-[var(--color-on-surface)] tactile-button px-2 py-0.5 font-bold text-xs shrink-0 flex items-center justify-center min-w-[28px] h-[26px]"
+                              title={copiedWebhookUrl ? 'Copied!' : 'Copy URL'}
+                            >
+                              <span className="material-symbols-outlined text-[13px]">
+                                {copiedWebhookUrl ? 'check' : 'content_copy'}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Test Payload (JSON Simulation)</label>
+                          <textarea
+                            value={data.mockPayload !== undefined ? data.mockPayload : '{\n  "message": "Hello from external webhook!",\n  "userId": 42\n}'}
+                            onChange={(e) => handleChange('mockPayload', e.target.value)}
+                            className="w-full h-24 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                            placeholder='{"event": "user.created", "data": { ... }}'
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedNode.type === 'webhookResponse' && (
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">HTTP Status Code</label>
+                          <div className="flex gap-2">
+                            <select
+                              value={data.statusCode || '200'}
+                              onChange={(e) => handleChange('statusCode', e.target.value)}
+                              className="w-2/3 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                            >
+                              <option value="200">200 - OK (Success)</option>
+                              <option value="201">201 - Created</option>
+                              <option value="202">202 - Accepted</option>
+                              <option value="400">400 - Bad Request (Client Error)</option>
+                              <option value="401">401 - Unauthorized</option>
+                              <option value="403">403 - Forbidden</option>
+                              <option value="404">404 - Not Found</option>
+                              <option value="422">422 - Unprocessable Entity</option>
+                              <option value="500">500 - Internal Server Error</option>
+                            </select>
+                            <input
+                              type="number"
+                              value={data.statusCode || 200}
+                              onChange={(e) => handleChange('statusCode', parseInt(e.target.value, 10) || 200)}
+                              className="w-1/3 bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                              placeholder="200"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Response Content-Type</label>
+                          <select
+                            value={data.contentType || 'application/json'}
+                            onChange={(e) => handleChange('contentType', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="application/json">application/json (JSON Payload)</option>
+                            <option value="text/plain">text/plain (Raw String / Text)</option>
+                            <option value="text/html">text/html (HTML Markup)</option>
+                            <option value="application/xml">application/xml (XML Document)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Response Body Payload</label>
+                          <textarea
+                            value={data.responseBody !== undefined ? data.responseBody : '{{lastOutput}}'}
+                            onChange={(e) => handleChange('responseBody', e.target.value)}
+                            className="w-full h-32 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2.5 inset-input resize-y outline-none"
+                            placeholder='{{lastOutput}} or {\n  "success": true,\n  "data": {{lastOutput}}\n}'
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Custom Response Headers (JSON)</label>
+                          <textarea
+                            value={data.customHeaders || ''}
+                            onChange={(e) => handleChange('customHeaders', e.target.value)}
+                            className="w-full h-20 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                            placeholder='{\n  "X-Custom-API-Version": "1.0",\n  "X-Execution-Engine": "LLMCraft"\n}'
+                          />
+                        </div>
                       </div>
                     )}
                   </div>

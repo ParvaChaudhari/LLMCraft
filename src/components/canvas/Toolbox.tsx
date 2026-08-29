@@ -42,6 +42,7 @@ const toolItems: ToolItem[] = [
   { type: 'billboard',      name: 'Billboard',        icon: 'signpost',     description: 'Note & Annotation',         longDescription: 'Place customizable notes, pipeline headers, and workflow documentation directly onto the city canvas.', color: '#eab308', asset: 'billboard.png' },
   { type: 'objectStorage',  name: 'Object Storage',   icon: 'cloud_upload', description: 'S3 / R2 / MinIO Buckets',   longDescription: 'Store, retrieve, list, or delete files, images, and documents in AWS S3, Cloudflare R2, MinIO, or Supabase Storage buckets.', color: '#0284c7', asset: 'object_storage.png' },
   { type: 'audioStudio',    name: 'Audio Studio',     icon: 'mic',          description: 'Gemini Voice Synthesis',    longDescription: 'Transcribe audio recordings or synthesize high-quality spoken voices using Google Gemini 3.6 Flash native audio generation.', color: '#d946ef', asset: 'recording_studio.png' },
+  { type: 'webhookResponse', name: 'Reply Tower',     icon: 'send_time_extension', description: 'Webhook HTTP Response', longDescription: 'Return synchronous HTTP responses (custom status code, headers, and body) back to external callers and webhooks.', color: '#2dd4bf', asset: 'reply_tower.png' },
 ];
 
 export default function Toolbox({ onOpenSecretManager }: { onOpenSecretManager?: () => void }) {

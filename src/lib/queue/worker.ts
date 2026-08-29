@@ -1810,6 +1810,52 @@ const executeNode = async (job: Job) => {
       newContext.lastOutput = `Error (Audio Studio): ${err.message}`;
       newContext[nodeId] = newContext.lastOutput;
     }
+  } else if (currentNode.type === 'webhookResponse') {
+    try {
+      const rawStatusCode = currentNode.data?.statusCode;
+      const statusCode = typeof rawStatusCode === 'number' ? rawStatusCode : parseInt(rawStatusCode, 10) || 200;
+      const contentType = currentNode.data?.contentType || 'application/json';
+      const rawBody = currentNode.data?.responseBody !== undefined ? currentNode.data.responseBody : '{{lastOutput}}';
+      const evaluatedBody = replaceVariables(rawBody, newContext);
+
+      // Parse custom headers if provided
+      let customHeaders: Record<string, string> = { 'Content-Type': contentType };
+      if (currentNode.data?.customHeaders) {
+        try {
+          const rawHeaders = replaceVariables(currentNode.data.customHeaders, newContext);
+          const parsed = JSON.parse(rawHeaders);
+          if (typeof parsed === 'object' && parsed !== null) {
+            customHeaders = { ...customHeaders, ...parsed };
+          }
+        } catch (e) {
+          console.warn('[Queue] Failed to parse custom response headers JSON:', e);
+        }
+      }
+
+      console.log(`[Queue] Webhook Response (Reply Tower) dispatching status ${statusCode} (${contentType}): "${evaluatedBody.slice(0, 80)}..."`);
+
+      // Store in Redis response key & broadcast real-time event
+      const responseData = {
+        statusCode,
+        headers: customHeaders,
+        body: evaluatedBody,
+        nodeId,
+      };
+
+      // Set Redis key for synchronous webhook consumer to read
+      const responseKey = `webhook-response:${workflowId}`;
+      await connection.set(responseKey, JSON.stringify(responseData), 'EX', 300);
+
+      // Broadcast event
+      await broadcastEvent(workflowId, 'WEBHOOK_RESPONDED', responseData);
+
+      newContext.lastOutput = evaluatedBody;
+      newContext[nodeId] = newContext.lastOutput;
+    } catch (err: any) {
+      console.error('[Queue] Webhook Response Error:', err.message);
+      newContext.lastOutput = `Error (Webhook Response): ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
+    }
   }
   return true;
   // End of runLogic
@@ -1821,7 +1867,7 @@ const executeNode = async (job: Job) => {
   // ─────────────────────────────────────────────────────────────────────────────
   const LOOP_EXEMPT = new Set([
     'conditional', 'delay', 'webhook', 'limit', 'output',
-    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint', 'sawmill', 'billboard'
+    'postOffice', 'watchtower', 'jsonParser', 'bankVault', 'clocktower', 'merge', 'checkpoint', 'sawmill', 'billboard', 'webhookResponse'
   ]);
 
   if (!LOOP_EXEMPT.has(currentNode.type)) {

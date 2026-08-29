@@ -84,6 +84,7 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
     billboard:       'billboard.png',
     objectStorage:   'object_storage.png',
     audioStudio:     'recording_studio.png',
+    webhookResponse: 'reply_tower.png',
     // Generic/utility nodes intentionally excluded:
     //   conditional, limitToll
   };
