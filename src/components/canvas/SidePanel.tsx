@@ -2368,6 +2368,39 @@ export default function SidePanel({
                         </div>
                       </div>
                     )}
+
+                    {/* Standardized Fault Tolerance & Auto-Retry for all AI & Network Nodes */}
+                    {['geminiFactory', 'chatgptFactory', 'claudeFactory', 'httpRequest', 'watchtower', 'dbSilo', 'webScraper', 'apify', 'documentParser', 'artStudio', 'audioStudio', 'googleDrive', 'objectStorage', 'github', 'bankVault'].includes(selectedNode.type) && (
+                      <div className="pt-4 mt-2 border-t border-[var(--color-on-surface)] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">shield</span>
+                            Fault Tolerance & Auto-Retry
+                          </label>
+                          {data.retryCount && data.retryCount > 0 ? (
+                            <span className="text-[10px] font-bold bg-amber-500/20 text-amber-600 px-1.5 py-0.5 rounded uppercase">
+                              {data.retryCount}x Retry Active
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <div>
+                          <select
+                            value={data.retryCount !== undefined ? data.retryCount : 0}
+                            onChange={(e) => handleChange('retryCount', parseInt(e.target.value, 10))}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                          >
+                            <option value="0">Off (Fail immediately on error)</option>
+                            <option value="1">1x Retry (1s backoff)</option>
+                            <option value="2">2x Retries (1s, 2s exponential backoff)</option>
+                            <option value="3">3x Retries (1s, 2s, 4s exponential backoff)</option>
+                          </select>
+                          <p className="text-[11px] text-[var(--color-on-surface-variant)] mt-1 font-[family-name:var(--font-code-sm)] leading-relaxed">
+                            Automatically retries on 429 rate limits, 503/504 server timeouts, and socket drops.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

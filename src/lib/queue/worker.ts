@@ -109,6 +109,99 @@ const fetchApiKey = async (credentialId: string): Promise<string | null> => {
   }
 };
 
+// ─── FAULT TOLERANCE & AUTO-RETRY ENGINE ──────────────────────────────────────
+interface RetryOptions {
+  maxAttempts?: number;
+  baseDelayMs?: number;
+  nodeId?: string;
+  workflowId?: string;
+  nodeType?: string;
+}
+
+const isTransientError = (err: any): boolean => {
+  if (!err) return false;
+  const msg = (err.message || String(err)).toLowerCase();
+  const status = err.status || err.statusCode || err.code;
+
+  // Status code checks
+  if (status === 429 || status === 500 || status === 502 || status === 503 || status === 504) return true;
+
+  // String message checks for transient network or rate-limit issues
+  if (
+    msg.includes('429') ||
+    msg.includes('rate limit') ||
+    msg.includes('quota exceeded') ||
+    msg.includes('too many requests') ||
+    msg.includes('500') ||
+    msg.includes('502') ||
+    msg.includes('503') ||
+    msg.includes('504') ||
+    msg.includes('service unavailable') ||
+    msg.includes('gateway timeout') ||
+    msg.includes('overloaded') ||
+    msg.includes('econnreset') ||
+    msg.includes('etimedout') ||
+    msg.includes('socket hang up') ||
+    msg.includes('fetch failed') ||
+    msg.includes('network error')
+  ) {
+    // Non-retryable exclusions (invalid key or bad prompt syntax)
+    if (msg.includes('401') || msg.includes('unauthorized') || msg.includes('api key not valid') || msg.includes('invalid_api_key')) {
+      return false;
+    }
+    if (msg.includes('400') && !msg.includes('429') && !msg.includes('quota')) {
+      return false;
+    }
+    return true;
+  }
+  return false;
+};
+
+export const withRetry = async <T>(
+  fn: (attempt: number) => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> => {
+  const maxAttempts = Math.max(1, Math.min(4, options.maxAttempts || 1));
+  const baseDelayMs = options.baseDelayMs || 1000;
+
+  let lastError: any;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (err: any) {
+      lastError = err;
+      const isRetryable = isTransientError(err);
+      const hasMoreAttempts = attempt < maxAttempts;
+
+      if (!isRetryable || !hasMoreAttempts) {
+        throw err;
+      }
+
+      // Exponential backoff with jitter: baseDelay * 2^(attempt - 1) + jitter
+      const jitter = Math.floor(Math.random() * 200);
+      const delayMs = baseDelayMs * Math.pow(2, attempt - 1) + jitter;
+
+      const reason = err.message?.slice(0, 80) || 'Transient error';
+      console.warn(
+        `[Queue] ⚠️ Auto-Retry: ${options.nodeType || 'Node'} (${options.nodeId || 'unknown'}) encountered: "${reason}". Retrying in ${(delayMs / 1000).toFixed(1)}s (Attempt ${attempt}/${maxAttempts - 1})...`
+      );
+
+      if (options.workflowId && options.nodeId) {
+        await broadcastEvent(options.workflowId, 'LOG_ENTRY', {
+          nodeId: options.nodeId,
+          text: `⚠️ Auto-Retry: ${reason}. Retrying in ${(delayMs / 1000).toFixed(1)}s (Attempt ${attempt}/${maxAttempts - 1})...`,
+          type: 'warning',
+          time: new Date().toLocaleTimeString(),
+        });
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+};
+// ─────────────────────────────────────────────────────────────────────────────
+
 // The traversal logic for a single node
 const executeNode = async (job: Job) => {
   const { workflowId, nodeId, nodes, edges, context } = job.data;
@@ -220,54 +313,67 @@ const executeNode = async (job: Job) => {
 
       console.log(`[Queue] Calling ${currentNode.type} (${modelName}) with prompt: ${prompt}`);
 
-      try {
-        let output = "";
+      const retryCount = typeof currentNode.data?.retryCount === 'number'
+        ? currentNode.data.retryCount
+        : parseInt(currentNode.data?.retryCount, 10) || 0;
+      const maxAttempts = 1 + Math.max(0, Math.min(3, retryCount));
+      const baseDelayMs = parseInt(currentNode.data?.retryDelayMs, 10) || 1000;
 
-        switch (currentNode.type) {
-          case 'geminiFactory': {
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.generateContent(prompt);
-            output = result.response.text();
-            break;
+      try {
+        const output = await withRetry(async (attempt) => {
+          switch (currentNode.type) {
+            case 'geminiFactory': {
+              const genAI = new GoogleGenerativeAI(apiKey);
+              const model = genAI.getGenerativeModel({ model: modelName });
+              const result = await model.generateContent(prompt);
+              return result.response.text();
+            }
+            case 'chatgptFactory': {
+              const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`
+                },
+                body: JSON.stringify({
+                  model: modelName,
+                  messages: [{ role: 'user', content: prompt }]
+                })
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                const err: any = new Error(data.error?.message || `OpenAI API Error (Status: ${res.status})`);
+                err.status = res.status;
+                throw err;
+              }
+              return data.choices?.[0]?.message?.content || "No output returned.";
+            }
+            case 'claudeFactory': {
+              const res = await fetch('https://api.anthropic.com/v1/messages', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-api-key': apiKey,
+                  'anthropic-version': '2023-06-01'
+                },
+                body: JSON.stringify({
+                  model: modelName,
+                  max_tokens: 1024,
+                  messages: [{ role: 'user', content: prompt }]
+                })
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                const err: any = new Error(data.error?.message || `Anthropic API Error (Status: ${res.status})`);
+                err.status = res.status;
+                throw err;
+              }
+              return data.content?.[0]?.text || "No output returned.";
+            }
+            default:
+              return "No output returned.";
           }
-          case 'chatgptFactory': {
-            const res = await fetch('https://api.openai.com/v1/chat/completions', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify({
-                model: modelName,
-                messages: [{ role: 'user', content: prompt }]
-              })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error?.message || 'OpenAI API Error');
-            output = data.choices?.[0]?.message?.content || "No output returned.";
-            break;
-          }
-          case 'claudeFactory': {
-            const res = await fetch('https://api.anthropic.com/v1/messages', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': '2023-06-01'
-              },
-              body: JSON.stringify({
-                model: modelName,
-                max_tokens: 1024,
-                messages: [{ role: 'user', content: prompt }]
-              })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error?.message || 'Anthropic API Error');
-            output = data.content?.[0]?.text || "No output returned.";
-            break;
-          }
-        }
+        }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: currentNode.type });
 
         newContext.lastOutput = output;
         newContext[nodeId] = output;
@@ -298,20 +404,36 @@ const executeNode = async (job: Job) => {
       options.body = replaceVariables(currentNode.data.body, newContext);
     }
     
+    const retryCount = typeof currentNode.data?.retryCount === 'number'
+      ? currentNode.data.retryCount
+      : parseInt(currentNode.data?.retryCount, 10) || 0;
+    const maxAttempts = 1 + Math.max(0, Math.min(3, retryCount));
+    const baseDelayMs = parseInt(currentNode.data?.retryDelayMs, 10) || 1000;
+
     console.log(`[Queue] Making real HTTP ${method} request to ${url}...`);
     try {
-      const res = await fetch(url, options);
-      let data = await res.text();
-      try {
-        data = JSON.stringify(JSON.parse(data), null, 2);
-      } catch (e) {
-        // Keep as raw text if it's not valid JSON
-      }
+      const data = await withRetry(async () => {
+        const res = await fetch(url, options);
+        if (!res.ok && (res.status >= 500 || res.status === 429)) {
+          const err: any = new Error(`HTTP ${method} failed with status ${res.status}`);
+          err.status = res.status;
+          throw err;
+        }
+        let raw = await res.text();
+        try {
+          raw = JSON.stringify(JSON.parse(raw), null, 2);
+        } catch (e) {
+          // Keep as raw text if not JSON
+        }
+        return raw;
+      }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: 'httpRequest' });
+
       newContext.lastOutput = data;
       newContext[nodeId] = data;
     } catch (err: any) {
       console.error(`[Queue] HTTP Error:`, err.message);
       newContext.lastOutput = `Error: ${err.message}`;
+      newContext[nodeId] = newContext.lastOutput;
     }
   } else if (currentNode.type === 'watchtower') {
     const rawQuery = currentNode.data?.query || '{{lastOutput}}';
@@ -323,35 +445,47 @@ const executeNode = async (job: Job) => {
       newContext[nodeId] = newContext.lastOutput;
     } else {
       console.log(`[Queue] Watchtower searching Tavily for: ${query}`);
+      const retryCount = typeof currentNode.data?.retryCount === 'number'
+        ? currentNode.data.retryCount
+        : parseInt(currentNode.data?.retryCount, 10) || 0;
+      const maxAttempts = 1 + Math.max(0, Math.min(3, retryCount));
+      const baseDelayMs = parseInt(currentNode.data?.retryDelayMs, 10) || 1000;
+
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        
-        const res = await fetch('https://api.tavily.com/search', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: apiKey,
-            query: query,
-            search_depth: "advanced",
-            include_answer: "basic",
-            max_results: 5
-          }),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Tavily API Error');
-        
-        const formattedOutput = {
-          summary: data.answer || "No search results found.",
-          sources: (data.results || []).map((r: any) => ({
-            url: r.url,
-            content: r.content
-          }))
-        };
-        const output = JSON.stringify(formattedOutput, null, 2);
+        const output = await withRetry(async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000);
+          
+          const res = await fetch('https://api.tavily.com/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              api_key: apiKey,
+              query: query,
+              search_depth: "advanced",
+              include_answer: "basic",
+              max_results: 5
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          const data = await res.json();
+          if (!res.ok) {
+            const err: any = new Error(data.detail || `Tavily API Error (Status: ${res.status})`);
+            err.status = res.status;
+            throw err;
+          }
+          
+          const formattedOutput = {
+            summary: data.answer || "No search results found.",
+            sources: (data.results || []).map((r: any) => ({
+              url: r.url,
+              content: r.content
+            }))
+          };
+          return JSON.stringify(formattedOutput, null, 2);
+        }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: 'watchtower' });
 
         newContext.lastOutput = output;
         newContext[nodeId] = output;
@@ -492,19 +626,25 @@ const executeNode = async (job: Job) => {
       newContext.lastOutput = `Error: No SQL query provided.`;
       newContext[nodeId] = newContext.lastOutput;
     } else {
+      const retryCount = typeof currentNode.data?.retryCount === 'number'
+        ? currentNode.data.retryCount
+        : parseInt(currentNode.data?.retryCount, 10) || 0;
+      const maxAttempts = 1 + Math.max(0, Math.min(3, retryCount));
+      const baseDelayMs = parseInt(currentNode.data?.retryDelayMs, 10) || 1000;
+
       try {
         const connectionString = await fetchApiKey(credentialId);
         if (!connectionString) throw new Error('Credential not found or decryption failed.');
         
         const interpolatedQuery = replaceVariables(rawQuery, newContext);
-        
         console.log(`[Queue] DB Silo executing: ${interpolatedQuery.substring(0, 50)}...`);
-        
-        const pool = getPgPool(connectionString);
-        const res = await pool.query(interpolatedQuery);
-        
-        const resultString = JSON.stringify(res.rows, null, 2);
-        
+
+        const resultString = await withRetry(async () => {
+          const pool = getPgPool(connectionString);
+          const res = await pool.query(interpolatedQuery);
+          return JSON.stringify(res.rows, null, 2);
+        }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: 'dbSilo' });
+
         newContext.lastOutput = resultString;
         newContext[nodeId] = resultString;
       } catch (err: any) {

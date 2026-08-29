@@ -10,16 +10,16 @@ const getRedisClient = () => {
   });
 };
 
-export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return handleWebhook(req, params, 'POST');
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  return handleWebhook(req, props.params, 'POST');
 }
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return handleWebhook(req, params, 'GET');
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  return handleWebhook(req, props.params, 'GET');
 }
 
-export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  return handleWebhook(req, params, 'PUT');
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  return handleWebhook(req, props.params, 'PUT');
 }
 
 async function handleWebhook(req: NextRequest, paramsPromise: Promise<{ id: string }>, method: string) {
