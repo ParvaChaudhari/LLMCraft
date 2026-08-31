@@ -415,8 +415,10 @@ export default function SidePanel({
           
           if (eventName === 'NODE_STARTED') {
             setTerminalLogs(prev => [...prev, { time: timeStr, text: `Executing Node [${eventData.nodeId}]`, type: 'info' }]);
-          } else if (eventName === 'NODE_PROGRESS') {
-            setTerminalLogs(prev => [...prev, { time: timeStr, text: eventData.message, type: 'info' }]);
+          } else if (eventName === 'NODE_PROGRESS' || eventName === 'LOG_ENTRY') {
+            const msg = eventData.message || '';
+            const logType = msg.includes('❌') || msg.includes('⚠️') ? 'error' : msg.includes('✅') || msg.includes('🏁') ? 'success' : 'info';
+            setTerminalLogs(prev => [...prev, { time: timeStr, text: msg, type: logType }]);
           } else if (eventName === 'NODE_FINISHED') {
             const isError = typeof eventData.output === 'string' && eventData.output.startsWith('Error:');
             setTerminalLogs(prev => [...prev, { 
@@ -958,10 +960,60 @@ export default function SidePanel({
                                 placeholder="Summarize this: {{lastOutput}}"
                               />
                             </div>
+
+                            {/* Agent Mode & Tool Calling (AI Factory Nodes Only) */}
+                            <div className="pt-4 mt-2 border-t border-[var(--color-on-surface)] space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                                  <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                                  Agent Mode & Tool Calling
+                                </label>
+                                <button
+                                  onClick={() => handleChange('agentMode', !data.agentMode)}
+                                  className={`relative w-10 h-5 rounded-full transition-colors duration-200 ${data.agentMode ? 'bg-amber-500' : 'bg-[var(--color-surface-variant)]'}`}
+                                >
+                                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all duration-200 ${data.agentMode ? 'left-5' : 'left-0.5'}`} />
+                                </button>
+                              </div>
+
+                              {data.agentMode && (
+                                <div className="space-y-3">
+                                  <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] leading-relaxed">
+                                    Connect tool nodes (HTTP, DB, Search) to the <span className="text-amber-500 font-bold">amber pin</span> of this node. The AI will call them autonomously based on the prompt.
+                                  </p>
+
+                                  <div>
+                                    <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Max Tool Rounds</label>
+                                    <select
+                                      value={data.maxToolRounds || 5}
+                                      onChange={(e) => handleChange('maxToolRounds', parseInt(e.target.value, 10))}
+                                      className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1.5 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] font-bold"
+                                    >
+                                      <option value="1">1 (Single Tool Call)</option>
+                                      <option value="3">3 (Lightweight Agent)</option>
+                                      <option value="5">5 (Standard Agent)</option>
+                                      <option value="10">10 (Deep Research Agent)</option>
+                                    </select>
+                                    <p className="text-[11px] text-[var(--color-on-surface-variant)] mt-1 font-[family-name:var(--font-code-sm)]">Maximum number of tool calls before forcing a final answer.</p>
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">Agent System Prompt (Optional)</label>
+                                    <textarea
+                                      value={data.agentSystemPrompt || ''}
+                                      onChange={(e) => handleChange('agentSystemPrompt', e.target.value)}
+                                      className="w-full h-20 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                      placeholder="You are a helpful assistant. Use the available tools to answer the user's question accurately."
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </>
                         )}
                       </>
                     )}
+
 
                     {selectedNode.type === 'httpRequest' && (
                       <>
@@ -1010,6 +1062,37 @@ export default function SidePanel({
                             placeholder='{"data": "{{previous_node.value}}"}'
                           />
                         </div>
+
+                        {/* Tool Calling Config for httpRequest */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                            Tool Calling Config (Agent Mode)
+                          </label>
+                          <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                            Fill to use as a callable tool for AI Factory nodes in Agent Mode.
+                          </p>
+                          <input
+                            type="text"
+                            value={data.toolName || ''}
+                            onChange={(e) => handleChange('toolName', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="Tool name: get_weather"
+                          />
+                          <input
+                            type="text"
+                            value={data.toolDescription || ''}
+                            onChange={(e) => handleChange('toolDescription', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder='Tool description: Fetches live weather for a city.'
+                          />
+                          <textarea
+                            value={data.toolSchema || ''}
+                            onChange={(e) => handleChange('toolSchema', e.target.value)}
+                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                            placeholder='{"city": {"type": "string", "description": "The city name"}}'
+                          />
+                        </div>
                       </>
                     )}
 
@@ -1025,25 +1108,66 @@ export default function SidePanel({
                             placeholder="{{webhook.query}} or 'latest news'"
                           />
                         </div>
+
+                        {/* Tool Calling Config for watchtower */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                            Tool Calling Config (Agent Mode)
+                          </label>
+                          <input
+                            type="text"
+                            value={data.toolName || 'search_web'}
+                            onChange={(e) => handleChange('toolName', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="search_web"
+                          />
+                          <input
+                            type="text"
+                            value={data.toolDescription || ''}
+                            onChange={(e) => handleChange('toolDescription', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="Searches the web for up-to-date information."
+                          />
+                        </div>
                       </div>
                     )}
 
                     {selectedNode.type === 'dbSilo' && (
                       <div className="space-y-2">
-                        <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">SQL Query (Supports {"{{"}variable{"}}"} interpolation)</label>
+                        <label className="block text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold mb-2 uppercase text-[var(--color-on-primary-container)]">SQL Query (Supports {"{{variable}}"} interpolation)</label>
                         <textarea
                           value={data.query || ''}
                           onChange={(e) => handleChange('query', e.target.value)}
                           className="w-full h-32 p-3 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] inset-input resize-y outline-none"
                           placeholder="SELECT * FROM users WHERE email = '{{lastOutput}}';"
                         />
-                      </div>
-                    )}
-
-                    {selectedNode.type === 'jsonParser' && (
-                      <div className="space-y-4">
-                        <div className="bg-[var(--color-surface)] p-[var(--spacing-gutter-sm)] inset-input text-center text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]">
-                          Automatically extracts JSON. No configuration required.
+                        {/* Tool Calling Config for dbSilo */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                            Tool Calling Config (Agent Mode)
+                          </label>
+                          <input
+                            type="text"
+                            value={data.toolName || ''}
+                            onChange={(e) => handleChange('toolName', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="Tool name: lookup_customer"
+                          />
+                          <input
+                            type="text"
+                            value={data.toolDescription || ''}
+                            onChange={(e) => handleChange('toolDescription', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder='Tool description: Looks up customer data by email.'
+                          />
+                          <textarea
+                            value={data.toolSchema || ''}
+                            onChange={(e) => handleChange('toolSchema', e.target.value)}
+                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                            placeholder='{"email": {"type": "string", "description": "Customer email address"}}'
+                          />
                         </div>
                       </div>
                     )}

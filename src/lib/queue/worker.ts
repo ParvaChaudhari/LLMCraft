@@ -281,6 +281,123 @@ const executeNode = async (job: Job) => {
     return;
   }
 
+  // ─── TOOL CALLING HELPERS ────────────────────────────────────────────────────
+
+  // Collect tool node definitions from edges connected to the 'tool' handle
+  const collectToolNodes = () => {
+    const toolEdges = edges.filter((e: any) => e.target === nodeId && e.targetHandle === 'tool');
+    return toolEdges
+      .map((e: any) => nodes.find((n: any) => n.id === e.source))
+      .filter(Boolean)
+      .filter((n: any) => n.data?.toolName);
+  };
+
+  // Execute a single tool node inline (synchronously within the agentic loop)
+  const executeTool = async (toolNode: any, toolArgs: Record<string, string>): Promise<string> => {
+    // Build a temporary context with tool args injected
+    const toolContext = { ...newContext, ...toolArgs };
+    // Inject args into all string fields of toolArgs as named variables too
+    Object.entries(toolArgs).forEach(([k, v]) => { toolContext[k] = String(v); });
+
+    if (toolNode.type === 'httpRequest') {
+      const url = replaceVariables(toolNode.data?.url || '', toolContext);
+      const method = toolNode.data?.method || 'GET';
+      const options: RequestInit = { method };
+      if (toolNode.data?.headers) {
+        try { options.headers = JSON.parse(replaceVariables(toolNode.data.headers, toolContext)); } catch (_) {}
+      }
+      if (toolNode.data?.body && ['POST', 'PUT', 'DELETE'].includes(method)) {
+        options.body = replaceVariables(toolNode.data.body, toolContext);
+      }
+      const res = await fetch(url, options);
+      let text = await res.text();
+      try { text = JSON.stringify(JSON.parse(text), null, 2); } catch (_) {}
+      return text;
+    }
+
+    if (toolNode.type === 'watchtower') {
+      const query = replaceVariables(toolNode.data?.query || Object.values(toolArgs)[0] || '', toolContext);
+      const apiKey = await fetchApiKey(toolNode.data?.credentialId);
+      if (!apiKey) return 'Error: Missing Tavily API key for search tool.';
+      const res = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey, query, search_depth: 'basic', max_results: 3 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Tavily search failed');
+      return JSON.stringify({ answer: data.answer, sources: (data.results || []).slice(0, 3).map((r: any) => ({ url: r.url, content: r.content })) }, null, 2);
+    }
+
+    if (toolNode.type === 'dbSilo') {
+      const connStr = await fetchApiKey(toolNode.data?.credentialId);
+      if (!connStr) return 'Error: Missing Postgres credential for DB tool.';
+      const query = replaceVariables(toolNode.data?.query || '', toolContext);
+      const pool = getPgPool(connStr);
+      const result = await pool.query(query);
+      return JSON.stringify(result.rows, null, 2);
+    }
+
+    return 'Tool type not supported for agent mode.';
+  };
+
+  // Build tool schema for Gemini (FunctionDeclarations format)
+  const buildGeminiTools = (toolNodes: any[]) => {
+    return [{
+      functionDeclarations: toolNodes.map((n: any) => {
+        let params: any = {};
+        try { params = JSON.parse(n.data?.toolSchema || '{}'); } catch (_) {}
+        return {
+          name: n.data.toolName,
+          description: n.data.toolDescription || `Tool: ${n.data.toolName}`,
+          parameters: {
+            type: 'object',
+            properties: params,
+            required: Object.keys(params),
+          },
+        };
+      }),
+    }];
+  };
+
+  // Build tool schema for OpenAI / ChatGPT (tools array format)
+  const buildOpenAITools = (toolNodes: any[]) => {
+    return toolNodes.map((n: any) => {
+      let params: any = {};
+      try { params = JSON.parse(n.data?.toolSchema || '{}'); } catch (_) {}
+      return {
+        type: 'function',
+        function: {
+          name: n.data.toolName,
+          description: n.data.toolDescription || `Tool: ${n.data.toolName}`,
+          parameters: {
+            type: 'object',
+            properties: params,
+            required: Object.keys(params),
+          },
+        },
+      };
+    });
+  };
+
+  // Build tool schema for Anthropic / Claude (tools array format)
+  const buildClaudeTools = (toolNodes: any[]) => {
+    return toolNodes.map((n: any) => {
+      let params: any = {};
+      try { params = JSON.parse(n.data?.toolSchema || '{}'); } catch (_) {}
+      return {
+        name: n.data.toolName,
+        description: n.data.toolDescription || `Tool: ${n.data.toolName}`,
+        input_schema: {
+          type: 'object',
+          properties: params,
+          required: Object.keys(params),
+        },
+      };
+    });
+  };
+  // ─────────────────────────────────────────────────────────────────────────────
+
   // 1. Run specific node logic (wrapped so the array engine can call it per-item)
   const runLogic = async () => {
   if (['geminiFactory', 'chatgptFactory', 'claudeFactory'].includes(currentNode.type)) {
@@ -310,6 +427,9 @@ const executeNode = async (job: Job) => {
       const rawPrompt = currentNode.data?.prompt || defaultPrompts[currentNode.type];
       const prompt = replaceVariables(rawPrompt, newContext);
       const modelName = currentNode.data?.model || defaultModels[currentNode.type];
+      const agentMode = currentNode.data?.agentMode === true;
+      const maxToolRounds = Math.max(1, Math.min(10, parseInt(currentNode.data?.maxToolRounds, 10) || 5));
+      const agentSystemPrompt = currentNode.data?.agentSystemPrompt || '';
 
       console.log(`[Queue] Calling ${currentNode.type} (${modelName}) with prompt: ${prompt}`);
 
@@ -320,25 +440,105 @@ const executeNode = async (job: Job) => {
       const baseDelayMs = parseInt(currentNode.data?.retryDelayMs, 10) || 1000;
 
       try {
-        const output = await withRetry(async (attempt) => {
-          switch (currentNode.type) {
-            case 'geminiFactory': {
-              const genAI = new GoogleGenerativeAI(apiKey);
-              const model = genAI.getGenerativeModel({ model: modelName });
-              const result = await model.generateContent(prompt);
-              return result.response.text();
+        // ── Agent Mode: Agentic Tool-Calling Loop ─────────────────────────────
+        if (agentMode) {
+          const toolNodes = collectToolNodes();
+
+          if (toolNodes.length === 0) {
+            console.log(`[Queue] ⚠️ Agent Mode ON for ${currentNode.type} (${nodeId}) but no tool nodes connected.`);
+            await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `⚠️ Agent Mode ON but no tool nodes connected. Running standard call.` });
+          } else {
+            console.log(`[Queue] 🤖 Agent Mode ON for ${currentNode.type} (${nodeId}): ${toolNodes.length} tool(s) available ->`, toolNodes.map((n: any) => n.data?.toolName).join(', '));
+            await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🤖 Agent Mode: ${toolNodes.length} tool(s) available — ${toolNodes.map((n: any) => n.data.toolName).join(', ')}` });
+          }
+
+          let agentOutput = '';
+          
+          if (currentNode.type === 'geminiFactory' && toolNodes.length > 0) {
+            const { GoogleGenerativeAI } = require('@google/generative-ai');
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const geminiTools = buildGeminiTools(toolNodes);
+            const systemInstructionText = agentSystemPrompt || 'You are a helpful AI agent. Use the available tools to answer questions accurately.';
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              tools: geminiTools,
+              systemInstruction: {
+                role: 'system',
+                parts: [{ text: systemInstructionText }],
+              },
+            });
+
+            const chat = model.startChat({
+              history: [],
+            });
+
+            let round = 0;
+            let currentMessage: any = prompt;
+
+            while (round < maxToolRounds) {
+              round++;
+              console.log(`[Queue] 🔄 Agent Round ${round}/${maxToolRounds} for ${nodeId}...`);
+              await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔄 Agent Round ${round}/${maxToolRounds}...` });
+
+              const result = await chat.sendMessage(currentMessage);
+              const response = result.response;
+              const parts = response.candidates?.[0]?.content?.parts || [];
+
+              const toolCallParts = parts.filter((p: any) => p.functionCall);
+
+              if (toolCallParts.length === 0) {
+                // AI returned a final text answer
+                agentOutput = response.text();
+                console.log(`[Queue] 🏁 AI returned final answer (no more tool calls):`, agentOutput.slice(0, 100));
+                break;
+              }
+
+              // Execute all requested tools
+              const toolResultParts: any[] = [];
+              for (const part of toolCallParts) {
+                const { name, args } = part.functionCall;
+                const toolNode = toolNodes.find((n: any) => n.data.toolName === name);
+                if (!toolNode) {
+                  console.error(`[Queue] ❌ Tool "${name}" called by AI but not found in connected tool nodes.`);
+                  toolResultParts.push({ functionResponse: { name, response: { error: `Tool "${name}" not found.` } } });
+                  continue;
+                }
+                console.log(`[Queue] 🔧 Tool Call: ${name}(${JSON.stringify(args || {})})`);
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔧 Tool Call: ${name}(${JSON.stringify(args)})` });
+                const toolResult = await executeTool(toolNode, args || {});
+                console.log(`[Queue] ✅ Tool Result for ${name}:`, toolResult.slice(0, 200));
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `✅ Tool Result: ${toolResult.substring(0, 200)}${toolResult.length > 200 ? '...' : ''}` });
+                toolResultParts.push({ functionResponse: { name, response: { output: toolResult } } });
+              }
+
+              currentMessage = toolResultParts as any;
+              if (round === maxToolRounds) {
+                // Force final answer on last round
+                console.log(`[Queue] ⏳ Max tool rounds reached (${maxToolRounds}). Requesting final answer...`);
+                const finalResult = await chat.sendMessage('Please provide your final answer now based on the information gathered.');
+                agentOutput = finalResult.response.text();
+              }
             }
-            case 'chatgptFactory': {
+            if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
+
+
+          } else if (currentNode.type === 'chatgptFactory' && toolNodes.length > 0) {
+            const openaiTools = buildOpenAITools(toolNodes);
+            const systemMsg = agentSystemPrompt || 'You are a helpful AI agent. Use the available tools to answer questions accurately.';
+            const messages: any[] = [
+              { role: 'system', content: systemMsg },
+              { role: 'user', content: prompt }
+            ];
+
+            let round = 0;
+            while (round < maxToolRounds) {
+              round++;
+              await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔄 Agent Round ${round}/${maxToolRounds}...` });
+
               const res = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${apiKey}`
-                },
-                body: JSON.stringify({
-                  model: modelName,
-                  messages: [{ role: 'user', content: prompt }]
-                })
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                body: JSON.stringify({ model: modelName, messages, tools: openaiTools, tool_choice: 'auto' })
               });
               const data = await res.json();
               if (!res.ok) {
@@ -346,21 +546,52 @@ const executeNode = async (job: Job) => {
                 err.status = res.status;
                 throw err;
               }
-              return data.choices?.[0]?.message?.content || "No output returned.";
+
+              const choice = data.choices?.[0];
+              const assistantMsg = choice?.message;
+              messages.push(assistantMsg);
+
+              if (choice?.finish_reason !== 'tool_calls' || !assistantMsg?.tool_calls?.length) {
+                agentOutput = assistantMsg?.content || 'No output returned.';
+                break;
+              }
+
+              // Execute all tool calls
+              for (const toolCall of assistantMsg.tool_calls) {
+                const { name } = toolCall.function;
+                const args = JSON.parse(toolCall.function.arguments || '{}');
+                const toolNode = toolNodes.find((n: any) => n.data.toolName === name);
+                if (!toolNode) {
+                  messages.push({ role: 'tool', tool_call_id: toolCall.id, content: `Tool "${name}" not found.` });
+                  continue;
+                }
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔧 Tool Call: ${name}(${JSON.stringify(args)})` });
+                const toolResult = await executeTool(toolNode, args);
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `✅ Tool Result: ${toolResult.substring(0, 200)}${toolResult.length > 200 ? '...' : ''}` });
+                messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
+              }
+
+              if (round === maxToolRounds) {
+                // Force final answer
+                messages.push({ role: 'user', content: 'Please provide your final answer now based on the information gathered.' });
+              }
             }
-            case 'claudeFactory': {
+            if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
+
+          } else if (currentNode.type === 'claudeFactory' && toolNodes.length > 0) {
+            const claudeTools = buildClaudeTools(toolNodes);
+            const systemMsg = agentSystemPrompt || 'You are a helpful AI agent. Use the available tools to answer questions accurately.';
+            const messages: any[] = [{ role: 'user', content: prompt }];
+
+            let round = 0;
+            while (round < maxToolRounds) {
+              round++;
+              await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔄 Agent Round ${round}/${maxToolRounds}...` });
+
               const res = await fetch('https://api.anthropic.com/v1/messages', {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-api-key': apiKey,
-                  'anthropic-version': '2023-06-01'
-                },
-                body: JSON.stringify({
-                  model: modelName,
-                  max_tokens: 1024,
-                  messages: [{ role: 'user', content: prompt }]
-                })
+                headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+                body: JSON.stringify({ model: modelName, max_tokens: 4096, system: systemMsg, messages, tools: claudeTools })
               });
               const data = await res.json();
               if (!res.ok) {
@@ -368,16 +599,147 @@ const executeNode = async (job: Job) => {
                 err.status = res.status;
                 throw err;
               }
-              return data.content?.[0]?.text || "No output returned.";
-            }
-            default:
-              return "No output returned.";
-          }
-        }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: currentNode.type });
 
-        newContext.lastOutput = output;
-        newContext[nodeId] = output;
-        console.log(`[Queue] ${currentNode.type} Output: ${output.trim()}`);
+              const stopReason = data.stop_reason;
+              const contentBlocks = data.content || [];
+              messages.push({ role: 'assistant', content: contentBlocks });
+
+              if (stopReason !== 'tool_use') {
+                agentOutput = contentBlocks.find((b: any) => b.type === 'text')?.text || 'No output returned.';
+                break;
+              }
+
+              // Execute all tool use blocks
+              const toolResults: any[] = [];
+              for (const block of contentBlocks.filter((b: any) => b.type === 'tool_use')) {
+                const { name, input, id } = block;
+                const toolNode = toolNodes.find((n: any) => n.data.toolName === name);
+                if (!toolNode) {
+                  toolResults.push({ type: 'tool_result', tool_use_id: id, content: `Tool "${name}" not found.` });
+                  continue;
+                }
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🔧 Tool Call: ${name}(${JSON.stringify(input)})` });
+                const toolResult = await executeTool(toolNode, input || {});
+                await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `✅ Tool Result: ${toolResult.substring(0, 200)}${toolResult.length > 200 ? '...' : ''}` });
+                toolResults.push({ type: 'tool_result', tool_use_id: id, content: toolResult });
+              }
+              messages.push({ role: 'user', content: toolResults });
+
+              if (round === maxToolRounds) {
+                const finalRes = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+                  body: JSON.stringify({ model: modelName, max_tokens: 4096, system: systemMsg, messages: [...messages, { role: 'user', content: 'Please provide your final answer now.' }] })
+                });
+                const finalData = await finalRes.json();
+                agentOutput = finalData.content?.find((b: any) => b.type === 'text')?.text || 'Agent completed without a final answer.';
+              }
+            }
+            if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
+
+          } else {
+            // Agent mode ON but no tools — standard call
+            const output = await withRetry(async () => {
+              switch (currentNode.type) {
+                case 'geminiFactory': {
+                  const { GoogleGenerativeAI } = require('@google/generative-ai');
+                  const genAI = new GoogleGenerativeAI(apiKey);
+                  const model = genAI.getGenerativeModel({ model: modelName });
+                  const result = await model.generateContent(prompt);
+                  return result.response.text();
+                }
+                case 'chatgptFactory': {
+                  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                    body: JSON.stringify({ model: modelName, messages: [{ role: 'user', content: prompt }] })
+                  });
+                  const data = await res.json();
+                  if (!res.ok) { const err: any = new Error(data.error?.message); err.status = res.status; throw err; }
+                  return data.choices?.[0]?.message?.content || 'No output returned.';
+                }
+                case 'claudeFactory': {
+                  const res = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+                    body: JSON.stringify({ model: modelName, max_tokens: 1024, messages: [{ role: 'user', content: prompt }] })
+                  });
+                  const data = await res.json();
+                  if (!res.ok) { const err: any = new Error(data.error?.message); err.status = res.status; throw err; }
+                  return data.content?.[0]?.text || 'No output returned.';
+                }
+                default: return 'No output returned.';
+              }
+            }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: currentNode.type });
+            agentOutput = output;
+          }
+
+          newContext.lastOutput = agentOutput;
+          newContext[nodeId] = agentOutput;
+          await broadcastEvent(workflowId, 'LOG_ENTRY', { nodeId, message: `🏁 Agent finished. Final output: ${agentOutput.substring(0, 150)}${agentOutput.length > 150 ? '...' : ''}` });
+          console.log(`[Queue] ${currentNode.type} Agent Output: ${agentOutput.trim()}`);
+
+        } else {
+        // ── Standard (Non-Agent) Mode ────────────────────────────────────────
+          const output = await withRetry(async (attempt) => {
+            switch (currentNode.type) {
+              case 'geminiFactory': {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+              }
+              case 'chatgptFactory': {
+                const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                  },
+                  body: JSON.stringify({
+                    model: modelName,
+                    messages: [{ role: 'user', content: prompt }]
+                  })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  const err: any = new Error(data.error?.message || `OpenAI API Error (Status: ${res.status})`);
+                  err.status = res.status;
+                  throw err;
+                }
+                return data.choices?.[0]?.message?.content || "No output returned.";
+              }
+              case 'claudeFactory': {
+                const res = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01'
+                  },
+                  body: JSON.stringify({
+                    model: modelName,
+                    max_tokens: 1024,
+                    messages: [{ role: 'user', content: prompt }]
+                  })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                  const err: any = new Error(data.error?.message || `Anthropic API Error (Status: ${res.status})`);
+                  err.status = res.status;
+                  throw err;
+                }
+                return data.content?.[0]?.text || "No output returned.";
+              }
+              default:
+                return "No output returned.";
+            }
+          }, { maxAttempts, baseDelayMs, nodeId, workflowId, nodeType: currentNode.type });
+
+          newContext.lastOutput = output;
+          newContext[nodeId] = output;
+          console.log(`[Queue] ${currentNode.type} Output: ${output.trim()}`);
+        }
       } catch (err: any) {
         console.error(`[Queue] ${currentNode.type} Error:`, err.message);
         newContext.lastOutput = `Error: ${err.message}`;

@@ -57,6 +57,7 @@ import WebhookResponseNode from './nodes/WebhookResponseNode';
 
 import RoadEdge from './RoadEdge';
 import PipeEdge from './PipeEdge';
+import TunnelEdge from './TunnelEdge';
 import RoadLayer from './RoadLayer';
 import IsometricBackground from './IsometricBackground';
 
@@ -101,6 +102,7 @@ const nodeTypes = {
 const edgeTypes = {
   road: RoadEdge,
   pipe: PipeEdge,
+  tunnel: TunnelEdge,
 };
 
 // Start empty by default, they will either be loaded or manually added via toolbox
@@ -130,24 +132,24 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
   const [nodes, setNodes] = useState<Node[]>(defaultInitialNodes);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
-  
+
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [visualMode, setVisualMode] = useState<'roads' | 'pipes'>('roads');
   const [isSecretManagerOpen, setIsSecretManagerOpen] = useState(false);
-  
+
   const [workflowId, setWorkflowId] = useState<string | null>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const playbackQueueRef = useRef<any[]>([]);
   const isPlayingRef = useRef(false);
-  
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const execId = searchParams.get('execId');
   const [isPlaybackMode, setIsPlaybackMode] = useState(!!execId);
   const [playbackTime, setPlaybackTime] = useState<string>('');
-  
+
   const supabase = createClient();
 
   useEffect(() => {
@@ -178,7 +180,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
 
       if (data && data.graph_json) {
         let loadedNodes = data.graph_json.nodes || [];
-        
+
         if (execId) {
           const { data: execData, error: execError } = await supabase.from('executions').select('*').eq('id', execId).single();
           if (execData && execData.state_json) {
@@ -203,7 +205,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
   const handleSave = async () => {
     setIsSaving(true);
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       alert('You must be logged in to save.');
       setIsSaving(false);
@@ -225,7 +227,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       if (data) setWorkflowId(data.id);
       if (error) console.error("Save error:", error);
     }
-    
+
     setIsSaving(false);
     alert('Layout saved successfully!');
   };
@@ -233,24 +235,24 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
   // --- Playback Engine ---
   useEffect(() => {
     let timeoutId: any;
-    
+
     const processQueue = async () => {
       if (playbackQueueRef.current.length === 0) {
         isPlayingRef.current = false;
-        
+
         // If queue is empty and SSE is closed/done, we might want to check if all is finished.
         // For now, if queue is empty, we just wait.
         return;
       }
-      
+
       isPlayingRef.current = true;
       const payload = playbackQueueRef.current.shift();
       const { event: eventName, data: eventData } = payload;
-      
+
       if (eventName === 'NODE_STARTED') {
         setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
         timeoutId = setTimeout(processQueue, 0); // instantly next
-      } 
+      }
       else if (eventName === 'NODE_FINISHED') {
         setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
         if (eventData.type === 'output' || eventData.isLastNode) {
@@ -260,7 +262,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       }
       else if (eventName === 'EDGE_TRAVERSED') {
         const edgeIdsToAnimate = [eventData.edgeId];
-        
+
         // Peek ahead and batch ALL contiguous EDGE_TRAVERSED events!
         // This ensures parallel branches visually dispatch trucks simultaneously.
         while (
@@ -273,14 +275,14 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
 
         // Trigger animations for all batched edges simultaneously!
         setEdges(eds => eds.map(e => edgeIdsToAnimate.includes(e.id) ? { ...e, data: { ...e.data, isAnimating: true } } : e));
-        
+
         timeoutId = setTimeout(() => {
           setEdges(eds => eds.map(e => edgeIdsToAnimate.includes(e.id) ? { ...e, data: { ...e.data, isAnimating: false } } : e));
           processQueue(); // proceed after 2000ms
         }, 2000);
       }
     };
-    
+
     // Polling mechanism to kickstart queue if events arrive
     const pollInterval = setInterval(() => {
       if (playbackQueueRef.current.length > 0 && !isPlayingRef.current) {
@@ -370,7 +372,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
 
   const handleRun = async () => {
     if (isRunning) return;
-    
+
     const startNode = nodes.find(n => n.type === 'webhook');
     if (!startNode) {
       alert("Missing Radio Tower (Webhook) trigger!");
@@ -380,9 +382,9 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
     }
-    
+
     setIsRunning(true);
-    
+
     // Reset state
     setNodes(nds => nds.map(node => ({ ...node, data: { ...node.data, isLoading: false, output: undefined } })));
     setEdges(eds => eds.map(edge => ({ ...edge, data: { ...edge.data, isAnimating: false } })));
@@ -424,7 +426,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         try {
           const payload = JSON.parse(event.data);
           const { event: eventName, data: eventData } = payload;
-          
+
           // Ignore duplicate events from the backend for the start node,
           // since we already pushed them to the queue manually!
           if (eventName === 'NODE_STARTED' || eventName === 'NODE_FINISHED') {
@@ -433,17 +435,17 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
           if (eventName === 'EDGE_TRAVERSED') {
             if (eventData.source === startNode.id) return;
           }
-          
+
           if (visualMode === 'roads') {
             // Push to playback queue
             playbackQueueRef.current.push(payload);
           } else {
             // Instant Pipeline Execution
             const { event: eventName, data: eventData } = payload;
-            
+
             if (eventName === 'NODE_STARTED') {
               setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: true } } : n));
-            } 
+            }
             else if (eventName === 'NODE_FINISHED') {
               setNodes(nds => nds.map(n => n.id === eventData.nodeId ? { ...n, data: { ...n.data, isLoading: false, output: eventData.output } } : n));
               if (eventData.isLastNode) {
@@ -459,7 +461,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
               }, 500);
             }
           }
-        } catch(e) {}
+        } catch (e) { }
       };
 
       eventSource.onerror = () => {
@@ -485,7 +487,11 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       <div className="flex-1 h-full w-full relative overflow-hidden bg-[#d2b48c]" onDragOver={onDragOver} onDrop={onDrop}>
         <ReactFlow
           nodes={nodes}
-          edges={edges.map(e => ({ ...e, type: visualMode === 'pipes' ? 'pipe' : 'road' }))}
+          edges={edges.map(e => {
+            const isToolEdge = e.targetHandle === 'tool' || e.sourceHandle === 'tool';
+            if (isToolEdge) return { ...e, type: 'tunnel' };
+            return { ...e, type: visualMode === 'pipes' ? 'pipe' : 'road' };
+          })}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -575,7 +581,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
           <div className="bg-[#ffeb3b] text-black border-2 border-black p-3 font-[family-name:var(--font-code-sm)] text-xs font-bold shadow-[3px_3px_0_#000] flex items-center justify-center gap-2 relative pointer-events-auto">
             <span className="material-symbols-outlined">history</span>
             VIEWING PAST EXECUTION ({playbackTime})
-            <button 
+            <button
               onClick={() => {
                 // Navigate cleanly without execId — no race condition
                 window.location.href = window.location.pathname;
@@ -588,15 +594,14 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
         ) : (
           <>
             {/* Hardware Slider Toggle */}
-            <div 
+            <div
               className="relative bg-[var(--color-inverse-surface)] inset-input p-1 flex items-center w-80 h-12 cursor-pointer"
               onClick={() => setVisualMode(visualMode === 'roads' ? 'pipes' : 'roads')}
             >
               {/* Sliding Block */}
-              <div 
-                className={`absolute h-10 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                  visualMode === 'pipes' ? 'left-[calc(50%+2px)]' : 'left-1'
-                }`}
+              <div
+                className={`absolute h-10 w-[calc(50%-4px)] bg-[var(--color-surface)] tactile-button transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${visualMode === 'pipes' ? 'left-[calc(50%+2px)]' : 'left-1'
+                  }`}
               />
               {/* Labels */}
               <div className="relative z-10 flex w-full h-full text-sm font-bold font-[family-name:var(--font-code-sm)] pointer-events-none select-none">
@@ -616,7 +621,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
                 </div>
               </div>
             </div>
-            
+
             {/* Actions */}
             <div className="flex gap-3 ml-2">
               <button
@@ -634,9 +639,8 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
               <button
                 onClick={handleRun}
                 disabled={isRunning}
-                className={`w-12 h-12 flex items-center justify-center tactile-button transition-colors disabled:opacity-50 ${
-                  isRunning ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]' : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)]'
-                }`}
+                className={`w-12 h-12 flex items-center justify-center tactile-button transition-colors disabled:opacity-50 ${isRunning ? 'bg-[var(--color-surface-variant)] text-[var(--color-on-surface-variant)]' : 'bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[#06b6d4] hover:text-[var(--color-on-primary)]'
+                  }`}
                 title="Run Pipeline"
               >
                 {isRunning ? (
@@ -648,7 +652,7 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
             </div>
           </>
         )}
-        
+
         <button
           onClick={() => router.push('/dashboard')}
           className="h-12 px-4 flex items-center justify-center bg-[var(--color-surface)] text-[var(--color-on-surface)] hover:bg-[var(--color-surface-variant)] tactile-button transition-colors font-bold font-[family-name:var(--font-code-sm)] text-sm gap-2"
@@ -660,9 +664,9 @@ export default function CityCanvas({ cityId }: { cityId?: string }) {
       </div>
 
       {/* Sliding Side Panel */}
-      <SidePanel 
-        selectedNode={selectedNode} 
-        onClose={() => setSelectedNode(null)} 
+      <SidePanel
+        selectedNode={selectedNode}
+        onClose={() => setSelectedNode(null)}
         updateNodeData={updateNodeData}
         nodes={nodes}
         edges={edges}
