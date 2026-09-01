@@ -1310,6 +1310,34 @@ export default function SidePanel({
                             />
                           </div>
                         )}
+
+                        {/* Tool Calling Config for bankVault */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                            Tool Calling Config (Agent Mode)
+                          </label>
+                          <input
+                            type="text"
+                            value={data.toolName || ''}
+                            onChange={(e) => handleChange('toolName', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="Tool name: search_supabase_docs"
+                          />
+                          <input
+                            type="text"
+                            value={data.toolDescription || ''}
+                            onChange={(e) => handleChange('toolDescription', e.target.value)}
+                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                            placeholder="Tool description: Semantically searches the vector database for relevant documentation."
+                          />
+                          <textarea
+                            value={data.toolSchema || ''}
+                            onChange={(e) => handleChange('toolSchema', e.target.value)}
+                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                            placeholder='{"query": {"type": "string", "description": "Search query to find in knowledge base"}}'
+                          />
+                        </div>
                       </div>
                     )}
 

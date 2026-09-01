@@ -338,6 +338,57 @@ const executeNode = async (job: Job) => {
       return JSON.stringify(result.rows, null, 2);
     }
 
+    if (toolNode.type === 'bankVault') {
+      const { mode, credentialId, embeddingCredentialId, tableName, matchCount } = toolNode.data || {};
+      const input = Object.values(toolArgs)[0] || toolContext.query || toolContext.input || newContext.lastOutput || '';
+      if (!credentialId || !embeddingCredentialId) return 'Error: Supabase Center is missing required credentials.';
+      if (!input) return 'Error: Supabase Center received empty search input.';
+      
+      const [dbConnectionString, embeddingKey] = await Promise.all([
+        fetchApiKey(credentialId),
+        fetchApiKey(embeddingCredentialId)
+      ]);
+      if (!dbConnectionString) return 'Error: Database credential not found.';
+      if (!embeddingKey) return 'Error: Embedding credential not found.';
+
+      let embeddingVector: number[] = [];
+      if (embeddingKey.startsWith('AIza')) {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-2:embedContent?key=${embeddingKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: "models/gemini-embedding-2",
+            content: { parts: [{ text: input }] }
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) return `Error: Gemini Embedding failed: ${data.error?.message}`;
+        embeddingVector = data.embedding.values;
+      } else {
+        const res = await fetch('https://api.openai.com/v1/embeddings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${embeddingKey}` },
+          body: JSON.stringify({ model: 'text-embedding-3-small', input })
+        });
+        const data = await res.json();
+        if (!res.ok) return `Error: OpenAI Embedding failed: ${data.error?.message}`;
+        embeddingVector = data.data[0].embedding;
+      }
+
+      const pool = getPgPool(dbConnectionString);
+      const table = tableName || 'documents';
+      if (mode === 'search') {
+        const limit = matchCount || 3;
+        const query = `SELECT content FROM ${table} ORDER BY embedding <-> $1 LIMIT $2`;
+        const res = await pool.query(query, [`[${embeddingVector.join(',')}]`, limit]);
+        return JSON.stringify(res.rows, null, 2);
+      } else {
+        const query = `INSERT INTO ${table} (content, embedding) VALUES ($1, $2)`;
+        await pool.query(query, [input, `[${embeddingVector.join(',')}]`]);
+        return `Successfully saved document to ${table}.`;
+      }
+    }
+
     return 'Tool type not supported for agent mode.';
   };
 
