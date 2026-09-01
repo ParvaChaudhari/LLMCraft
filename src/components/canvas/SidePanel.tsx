@@ -168,6 +168,11 @@ export default function SidePanel({
   const terminalScrollRef = useRef<HTMLDivElement>(null);
   const [savedWorkflows, setSavedWorkflows] = useState<{id: string, name: string, graph_json?: any}[]>([]);
   const [copiedWebhookUrl, setCopiedWebhookUrl] = useState(false);
+  const [isToolConfigExpanded, setIsToolConfigExpanded] = useState<boolean>(false);
+
+  useEffect(() => {
+    setIsToolConfigExpanded(Boolean(selectedNode?.data?.toolName));
+  }, [selectedNode?.id]);
 
   useEffect(() => {
     if (selectedNode?.type === 'airport') {
@@ -1065,33 +1070,52 @@ export default function SidePanel({
 
                         {/* Tool Calling Config for httpRequest */}
                         <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
-                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
-                            Tool Calling Config (Agent Mode)
-                          </label>
-                          <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
-                            Fill to use as a callable tool for AI Factory nodes in Agent Mode.
-                          </p>
-                          <input
-                            type="text"
-                            value={data.toolName || ''}
-                            onChange={(e) => handleChange('toolName', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="Tool name: get_weather"
-                          />
-                          <input
-                            type="text"
-                            value={data.toolDescription || ''}
-                            onChange={(e) => handleChange('toolDescription', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder='Tool description: Fetches live weather for a city.'
-                          />
-                          <textarea
-                            value={data.toolSchema || ''}
-                            onChange={(e) => handleChange('toolSchema', e.target.value)}
-                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
-                            placeholder='{"city": {"type": "string", "description": "The city name"}}'
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Fill to use as a callable tool for AI Factory nodes in Agent Mode.
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: get_weather"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder='Tool description: Fetches live weather for a city.'
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"city": {"type": "string", "description": "The city name"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </>
                     )}
@@ -1111,24 +1135,52 @@ export default function SidePanel({
 
                         {/* Tool Calling Config for watchtower */}
                         <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
-                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
-                            Tool Calling Config (Agent Mode)
-                          </label>
-                          <input
-                            type="text"
-                            value={data.toolName || 'search_web'}
-                            onChange={(e) => handleChange('toolName', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="search_web"
-                          />
-                          <input
-                            type="text"
-                            value={data.toolDescription || ''}
-                            onChange={(e) => handleChange('toolDescription', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="Searches the web for up-to-date information."
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Fill to use as a callable tool for AI Factory nodes in Agent Mode.
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: search_web"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Searches the web for up-to-date information."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"query": {"type": "string", "description": "The search query"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1144,30 +1196,49 @@ export default function SidePanel({
                         />
                         {/* Tool Calling Config for dbSilo */}
                         <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
-                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
-                            Tool Calling Config (Agent Mode)
-                          </label>
-                          <input
-                            type="text"
-                            value={data.toolName || ''}
-                            onChange={(e) => handleChange('toolName', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="Tool name: lookup_customer"
-                          />
-                          <input
-                            type="text"
-                            value={data.toolDescription || ''}
-                            onChange={(e) => handleChange('toolDescription', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder='Tool description: Looks up customer data by email.'
-                          />
-                          <textarea
-                            value={data.toolSchema || ''}
-                            onChange={(e) => handleChange('toolSchema', e.target.value)}
-                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
-                            placeholder='{"email": {"type": "string", "description": "Customer email address"}}'
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: lookup_customer"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder='Tool description: Looks up customer data by email.'
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"email": {"type": "string", "description": "Customer email address"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1313,30 +1384,49 @@ export default function SidePanel({
 
                         {/* Tool Calling Config for bankVault */}
                         <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
-                          <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5">
-                            <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
-                            Tool Calling Config (Agent Mode)
-                          </label>
-                          <input
-                            type="text"
-                            value={data.toolName || ''}
-                            onChange={(e) => handleChange('toolName', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="Tool name: search_supabase_docs"
-                          />
-                          <input
-                            type="text"
-                            value={data.toolDescription || ''}
-                            onChange={(e) => handleChange('toolDescription', e.target.value)}
-                            className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
-                            placeholder="Tool description: Semantically searches the vector database for relevant documentation."
-                          />
-                          <textarea
-                            value={data.toolSchema || ''}
-                            onChange={(e) => handleChange('toolSchema', e.target.value)}
-                            className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
-                            placeholder='{"query": {"type": "string", "description": "Search query to find in knowledge base"}}'
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: search_supabase_docs"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Semantically searches the vector database for relevant documentation."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"query": {"type": "string", "description": "Search query to find in knowledge base"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1544,6 +1634,56 @@ export default function SidePanel({
                             className="w-full h-48 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-3 inset-input resize-y outline-none"
                             spellCheck={false}
                           />
+                        </div>
+
+                        {/* Tool Calling Config for customWorkshop */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Allow AI Agents to execute custom JavaScript scripts or calculations.
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: execute_code"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Executes custom JavaScript code to perform precise calculations or data transformations."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"code": {"type": "string", "description": "JavaScript code string to evaluate, returning a value"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}

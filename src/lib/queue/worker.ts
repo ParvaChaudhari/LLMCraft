@@ -389,6 +389,33 @@ const executeNode = async (job: Job) => {
       }
     }
 
+    if (toolNode.type === 'customWorkshop') {
+      const dynamicCode = toolArgs.code || toolNode.data?.code || 'return context.lastOutput;';
+      try {
+        const workshopFn = new Function('context', 'console', `
+          return (async () => {
+            ${dynamicCode}
+          })();
+        `);
+        const workshopConsole = {
+          log: (...args: any[]) => console.log(`[Workshop Tool Log]`, ...args),
+          error: (...args: any[]) => console.error(`[Workshop Tool Error]`, ...args),
+        };
+        const fnResult = workshopFn(toolContext, workshopConsole);
+        let timeoutHandle: any;
+        const timeoutPromise = new Promise((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error('Workshop timed out after 5000ms')), 5000);
+        });
+        const result = await Promise.race([
+          Promise.resolve(fnResult).finally(() => clearTimeout(timeoutHandle)),
+          timeoutPromise
+        ]);
+        return typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result ?? 'Success');
+      } catch (err: any) {
+        return `Error executing workshop code: ${err.message}`;
+      }
+    }
+
     return 'Tool type not supported for agent mode.';
   };
 
@@ -562,12 +589,14 @@ const executeNode = async (job: Job) => {
                 toolResultParts.push({ functionResponse: { name, response: { output: toolResult } } });
               }
 
-              currentMessage = toolResultParts as any;
-              if (round === maxToolRounds) {
-                // Force final answer on last round
+              if (round >= maxToolRounds) {
+                // Final round: send tool results and get final answer
                 console.log(`[Queue] ⏳ Max tool rounds reached (${maxToolRounds}). Requesting final answer...`);
-                const finalResult = await chat.sendMessage('Please provide your final answer now based on the information gathered.');
+                const finalResult = await chat.sendMessage(toolResultParts as any);
                 agentOutput = finalResult.response.text();
+                break;
+              } else {
+                currentMessage = toolResultParts as any;
               }
             }
             if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
@@ -622,9 +651,16 @@ const executeNode = async (job: Job) => {
                 messages.push({ role: 'tool', tool_call_id: toolCall.id, content: toolResult });
               }
 
-              if (round === maxToolRounds) {
-                // Force final answer
-                messages.push({ role: 'user', content: 'Please provide your final answer now based on the information gathered.' });
+              if (round >= maxToolRounds) {
+                // Force final answer synthesis without allowing more tool calls
+                const finalRes = await fetch('https://api.openai.com/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                  body: JSON.stringify({ model: modelName, messages, tool_choice: 'none' })
+                });
+                const finalData = await finalRes.json();
+                agentOutput = finalData.choices?.[0]?.message?.content || 'No output returned.';
+                break;
               }
             }
             if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
@@ -676,14 +712,15 @@ const executeNode = async (job: Job) => {
               }
               messages.push({ role: 'user', content: toolResults });
 
-              if (round === maxToolRounds) {
+              if (round >= maxToolRounds) {
                 const finalRes = await fetch('https://api.anthropic.com/v1/messages', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-                  body: JSON.stringify({ model: modelName, max_tokens: 4096, system: systemMsg, messages: [...messages, { role: 'user', content: 'Please provide your final answer now.' }] })
+                  body: JSON.stringify({ model: modelName, max_tokens: 4096, system: systemMsg, messages })
                 });
                 const finalData = await finalRes.json();
                 agentOutput = finalData.content?.find((b: any) => b.type === 'text')?.text || 'Agent completed without a final answer.';
+                break;
               }
             }
             if (!agentOutput) agentOutput = 'Agent completed without a final answer.';
