@@ -1836,6 +1836,56 @@ export default function SidePanel({
                             />
                           </div>
                         )}
+
+                        {/* Callable Tool Section */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Allow AI Agents to interact with GitHub (fetch files, search issues, create issues, post comments).
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: github_tool"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Interacts with GitHub repositories to fetch files, search issues, or create issues."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-24 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"action": {"type": "string", "description": "fetch_file | search_issues | create_issue | post_comment"}, "repository": {"type": "string", "description": "owner/repo"}, "filePath": {"type": "string", "description": "Path to file"}, "query": {"type": "string", "description": "Issue search query"}, "title": {"type": "string", "description": "Issue title"}, "body": {"type": "string", "description": "Body or comment text"}}'
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
@@ -1850,6 +1900,56 @@ export default function SidePanel({
                             className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
                             placeholder="https://example.com or {{webhook.url}}"
                           />
+                        </div>
+
+                        {/* Callable Tool Section */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Allow AI Agents to scrape and read full web page content from any URL.
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: scrape_webpage"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Fetches and extracts clean, readable text from a specified webpage URL."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-16 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"url": {"type": "string", "description": "The URL of the webpage to scrape and read"}}'
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -2463,6 +2563,56 @@ export default function SidePanel({
                             </div>
                           </>
                         )}
+
+                        {/* Callable Tool Section */}
+                        <div className="pt-3 border-t border-[var(--color-on-surface)] space-y-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsToolConfigExpanded(!isToolConfigExpanded)}
+                            className="w-full flex items-center justify-between py-1 text-left hover:opacity-80 transition-opacity cursor-pointer"
+                          >
+                            <label className="text-[length:var(--text-label-caps)] font-[family-name:var(--font-label-caps)] font-bold uppercase text-[var(--color-on-primary-container)] flex items-center gap-1.5 cursor-pointer">
+                              <span className="material-symbols-outlined text-[15px] text-amber-500">build</span>
+                              Tool Calling Config (Agent Mode)
+                              {data.toolName && (
+                                <span className="text-[9px] font-mono bg-black text-amber-300 font-bold px-1.5 py-0.5 shadow-sm">
+                                  {data.toolName}
+                                </span>
+                              )}
+                            </label>
+                            <span className={`material-symbols-outlined text-[18px] text-[var(--color-on-surface-variant)] transition-transform duration-200 ${isToolConfigExpanded ? 'rotate-180' : ''}`}>
+                              expand_more
+                            </span>
+                          </button>
+
+                          {isToolConfigExpanded && (
+                            <div className="space-y-2 pt-1">
+                              <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)]">
+                                Allow AI Agents to interact with AWS S3 / Cloudflare R2 / MinIO storage (upload, read, list, delete objects).
+                              </p>
+                              <input
+                                type="text"
+                                value={data.toolName || ''}
+                                onChange={(e) => handleChange('toolName', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool name: s3_storage"
+                              />
+                              <input
+                                type="text"
+                                value={data.toolDescription || ''}
+                                onChange={(e) => handleChange('toolDescription', e.target.value)}
+                                className="w-full bg-[var(--color-surface)] text-[var(--color-on-surface)] py-1 px-2 inset-input outline-none font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)]"
+                                placeholder="Tool description: Uploads, reads, lists, or deletes files and data objects in an S3-compatible cloud storage bucket."
+                              />
+                              <textarea
+                                value={data.toolSchema || ''}
+                                onChange={(e) => handleChange('toolSchema', e.target.value)}
+                                className="w-full h-24 bg-[var(--color-surface)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] p-2 inset-input resize-y outline-none"
+                                placeholder='{"action": {"type": "string", "description": "read_object | upload_object | list_objects | delete_object"}, "bucketName": {"type": "string", "description": "S3 bucket name"}, "objectKey": {"type": "string", "description": "Object key / file path (or prefix for list_objects)"}, "body": {"type": "string", "description": "Content string to upload for upload_object"}, "contentType": {"type": "string", "description": "Content-Type for uploaded object"}}'
+                              />
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 

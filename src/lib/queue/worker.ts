@@ -416,6 +416,207 @@ const executeNode = async (job: Job) => {
       }
     }
 
+    if (toolNode.type === 'webScraper') {
+      const targetUrl = toolArgs.url || toolNode.data?.url;
+      if (!targetUrl) return 'Error: No target URL provided for web scraper.';
+      try {
+        console.log(`[Queue] 📰 Web Scraper Tool scraping URL: ${targetUrl}`);
+        const res = await fetch(targetUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          }
+        });
+        if (!res.ok) return `Error fetching URL (HTTP ${res.status}): ${res.statusText}`;
+        const html = await res.text();
+        const $ = cheerio.load(html);
+        $('script, style, noscript, iframe, img, svg, nav, footer, header').remove();
+        const rawText = $('body').text() || $.text();
+        let cleanText = rawText.replace(/\s+/g, ' ').trim();
+        if (cleanText.length > 25000) {
+          cleanText = cleanText.substring(0, 25000) + '\n\n... (Content truncated for length)';
+        }
+        return cleanText || 'No readable text content found at URL.';
+      } catch (err: any) {
+        return `Error scraping URL: ${err.message}`;
+      }
+    }
+
+    if (toolNode.type === 'github') {
+      const credentialId = toolNode.data?.credentialId;
+      if (!credentialId) return 'Error: GitHub Node is missing PAT credential.';
+      const githubToken = await fetchApiKey(credentialId);
+      if (!githubToken) return 'Error: GitHub PAT credential not found or invalid.';
+
+      const action = toolArgs.action || toolNode.data?.action || 'fetch_file';
+      const repository = toolArgs.repository || toolArgs.repo || toolNode.data?.repository;
+      const filePath = toolArgs.filePath || toolArgs.path || toolNode.data?.filePath;
+      const query = toolArgs.query || toolArgs.q || toolNode.data?.query;
+      const title = toolArgs.title || toolNode.data?.title;
+      const body = toolArgs.body || toolArgs.comment || toolNode.data?.body;
+      const issueNumber = toolArgs.issueNumber || toolArgs.issue_number || toolNode.data?.issueNumber;
+
+      const headers: any = {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'LLMCraft-Agent',
+        'Authorization': `token ${githubToken}`
+      };
+
+      try {
+        console.log(`[Queue] 🐙 GitHub Tool executing action "${action}" for repo "${repository}"`);
+        if (action === 'fetch_file') {
+          if (!repository || !filePath) return 'Error: repository and filePath are required to fetch a file.';
+          const res = await fetch(`https://api.github.com/repos/${repository}/contents/${filePath}`, { headers });
+          const json = await res.json();
+          if (!res.ok) return `GitHub Error (${res.status}): ${json.message || 'Failed to fetch file'}`;
+          if (json.content && json.encoding === 'base64') {
+            return Buffer.from(json.content, 'base64').toString('utf-8');
+          }
+          return JSON.stringify(json, null, 2);
+        } else if (action === 'search_issues') {
+          const searchQuery = query || (repository ? `repo:${repository} is:open` : 'is:open');
+          const res = await fetch(`https://api.github.com/search/issues?q=${encodeURIComponent(searchQuery)}`, { headers });
+          const json = await res.json();
+          if (!res.ok) return `GitHub Error (${res.status}): ${json.message || 'Failed to search issues'}`;
+          const items = (json.items || []).slice(0, 10).map((i: any) => ({
+            number: i.number,
+            title: i.title,
+            state: i.state,
+            user: i.user?.login,
+            url: i.html_url,
+            created_at: i.created_at,
+            body: i.body ? i.body.substring(0, 300) : ''
+          }));
+          return JSON.stringify(items, null, 2);
+        } else if (action === 'create_issue') {
+          if (!repository || !title) return 'Error: repository and title are required to create an issue.';
+          const res = await fetch(`https://api.github.com/repos/${repository}/issues`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, body: body || '' })
+          });
+          const json = await res.json();
+          if (!res.ok) return `GitHub Error (${res.status}): ${json.message || 'Failed to create issue'}`;
+          return JSON.stringify({ success: true, issue_url: json.html_url, number: json.number });
+        } else if (action === 'post_comment') {
+          if (!repository || !issueNumber) return 'Error: repository and issueNumber are required to post a comment.';
+          const res = await fetch(`https://api.github.com/repos/${repository}/issues/${issueNumber}/comments`, {
+            method: 'POST',
+            headers: { ...headers, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body: body || '' })
+          });
+          const json = await res.json();
+          if (!res.ok) return `GitHub Error (${res.status}): ${json.message || 'Failed to post comment'}`;
+          return JSON.stringify({ success: true, comment_url: json.html_url });
+        } else {
+          return `Error: Unsupported GitHub action: ${action}`;
+        }
+      } catch (err: any) {
+        return `GitHub Tool Execution Error: ${err.message}`;
+      }
+    }
+
+    if (toolNode.type === 'objectStorage') {
+      const action = toolArgs.action || toolNode.data?.action || 'read_object';
+      const bucketName = (toolArgs.bucketName || toolArgs.bucket || toolNode.data?.bucketName || '').trim();
+      const objectKey = (toolArgs.objectKey || toolArgs.key || toolArgs.path || toolNode.data?.objectKey || '').trim();
+      const bodyContent = toolArgs.body !== undefined ? toolArgs.body : (toolArgs.content !== undefined ? toolArgs.content : (toolNode.data?.body || ''));
+      const contentType = toolArgs.contentType || toolNode.data?.contentType || 'application/json';
+
+      let accessKeyId = '';
+      let secretAccessKey = '';
+      let region = 'us-east-1';
+      let endpoint: string | undefined = undefined;
+
+      const credentialId = toolNode.data?.credentialId;
+      const decryptedKey = credentialId ? await fetchApiKey(credentialId) : null;
+
+      if (decryptedKey) {
+        try {
+          const parsed = JSON.parse(decryptedKey);
+          accessKeyId = parsed.access_key_id || '';
+          secretAccessKey = parsed.secret_access_key || '';
+          region = parsed.region || 'us-east-1';
+          endpoint = parsed.endpoint || undefined;
+        } catch (_) {
+          accessKeyId = decryptedKey;
+        }
+      } else {
+        accessKeyId = toolNode.data?.accessKeyId || process.env.AWS_ACCESS_KEY_ID || '';
+        secretAccessKey = toolNode.data?.secretAccessKey || process.env.AWS_SECRET_ACCESS_KEY || '';
+        region = toolNode.data?.region || process.env.AWS_REGION || 'us-east-1';
+        endpoint = toolNode.data?.endpoint || process.env.AWS_ENDPOINT_URL || undefined;
+      }
+
+      if (!accessKeyId || !secretAccessKey) {
+        return 'Error: Missing S3 / R2 credentials on Object Storage node.';
+      }
+
+      if (!bucketName) {
+        return 'Error: bucketName is required for Object Storage tool.';
+      }
+
+      try {
+        const s3 = new S3Client({
+          region,
+          credentials: { accessKeyId, secretAccessKey },
+          endpoint: endpoint || undefined,
+          forcePathStyle: !!endpoint,
+        });
+
+        console.log(`[Queue] 🪣 Object Storage Tool executing "${action}" on bucket "${bucketName}" (key: "${objectKey}")`);
+
+        if (action === 'read_object') {
+          if (!objectKey) return 'Error: objectKey is required to read an object.';
+          const response = await s3.send(new GetObjectCommand({
+            Bucket: bucketName,
+            Key: objectKey,
+          }));
+          const fileContent = await response.Body?.transformToString();
+          return fileContent ?? '';
+        } else if (action === 'upload_object') {
+          if (!objectKey) return 'Error: objectKey is required to upload an object.';
+          await s3.send(new PutObjectCommand({
+            Bucket: bucketName,
+            Key: objectKey,
+            Body: typeof bodyContent === 'object' ? JSON.stringify(bodyContent, null, 2) : String(bodyContent),
+            ContentType: contentType,
+          }));
+          return JSON.stringify({
+            success: true,
+            action: 'upload_object',
+            bucket: bucketName,
+            key: objectKey,
+            s3Uri: `s3://${bucketName}/${objectKey}`,
+            url: endpoint ? `${endpoint.replace(/\/$/, '')}/${bucketName}/${objectKey}` : `https://${bucketName}.s3.${region}.amazonaws.com/${objectKey}`
+          }, null, 2);
+        } else if (action === 'list_objects') {
+          const response = await s3.send(new ListObjectsV2Command({
+            Bucket: bucketName,
+            Prefix: objectKey || undefined,
+            MaxKeys: 50,
+          }));
+          const items = (response.Contents || []).map(item => ({
+            key: item.Key,
+            size: item.Size,
+            lastModified: item.LastModified?.toISOString(),
+          }));
+          return JSON.stringify(items, null, 2);
+        } else if (action === 'delete_object') {
+          if (!objectKey) return 'Error: objectKey is required to delete an object.';
+          await s3.send(new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: objectKey,
+          }));
+          return JSON.stringify({ success: true, action: 'delete_object', bucket: bucketName, deletedKey: objectKey });
+        } else {
+          return `Error: Unsupported Object Storage action: ${action}`;
+        }
+      } catch (err: any) {
+        return `Object Storage Tool Execution Error: ${err.message}`;
+      }
+    }
+
     return 'Tool type not supported for agent mode.';
   };
 
