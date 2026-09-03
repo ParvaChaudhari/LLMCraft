@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import IsometricCompound from './IsometricCompound';
 import ApprovalsModal from './ApprovalsModal';
+import { TEMPLATES, instantiateTemplate } from '@/lib/templates';
 
 export default function DashboardPage() {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorkflow, setSelectedWorkflow] = useState<any | null>(null);
   const [showNewSectorModal, setShowNewSectorModal] = useState(false);
-  const [newSectorName, setNewSectorName] = useState('');
+  const [newSectorName, setNewSectorName] = useState('Web Research City');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('web-research-agent');
   const [isCreating, setIsCreating] = useState(false);
 
   const [isEditingName, setIsEditingName] = useState(false);
@@ -131,7 +133,7 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const initialGraph = { nodes: [], edges: [] };
+    const initialGraph = instantiateTemplate(selectedTemplateId);
     const { data, error } = await supabase
       .from('workflows')
       .insert([
@@ -862,8 +864,8 @@ export default function DashboardPage() {
       )}
 
       {showNewSectorModal && (
-        <div className="fixed inset-0 bg-[var(--color-on-surface)]/80 backdrop-blur-sm flex items-center justify-center z-[100]">
-          <form onSubmit={handleCreateSector} className="w-[400px] bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative z-10">
+        <div className="fixed inset-0 bg-[var(--color-on-surface)]/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <form onSubmit={handleCreateSector} className="w-[560px] max-w-[95vw] bg-[var(--color-surface)] bevel-container shadow-[8px_8px_0_0_rgba(0,0,0,1)] flex flex-col relative z-10 animate-in fade-in zoom-in-95 duration-150">
             <div className="bg-[var(--color-inverse-surface)] border-b-2 border-[var(--color-on-surface)] p-[var(--spacing-gutter-sm)] flex justify-between items-center relative overflow-hidden">
               <div className="absolute inset-0 scanline opacity-30 pointer-events-none"></div>
               <div className="flex items-center gap-[var(--spacing-gutter-sm)] relative z-10">
@@ -875,18 +877,90 @@ export default function DashboardPage() {
               </button>
             </div>
             
-            <div className="p-[var(--spacing-gutter-md)] flex flex-col gap-[var(--spacing-gutter-md)]">
-              <label className="font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-widest">CITY NAME:</label>
-              <input
-                autoFocus
-                type="text"
-                value={newSectorName}
-                onChange={e => setNewSectorName(e.target.value)}
-                placeholder="e.g. Neo Tokyo"
-                className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-3 py-2 bevel-inset focus:outline-none placeholder:text-[var(--color-on-surface-variant)]"
-              />
-              <button disabled={isCreating || !newSectorName.trim()} type="submit" className="bg-[var(--color-tertiary-fixed)] text-[var(--color-on-tertiary-fixed)] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold px-4 py-2 border-2 border-[var(--color-on-surface)] retro-btn cursor-pointer w-full mt-2 disabled:opacity-50">
-                {isCreating ? 'INITIALIZING...' : 'START CONSTRUCTION'}
+            <div className="p-[var(--spacing-gutter-md)] flex flex-col gap-4">
+              <div>
+                <label className="block font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-widest mb-1">
+                  CITY NAME:
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={newSectorName}
+                  onChange={e => setNewSectorName(e.target.value)}
+                  placeholder="e.g. Web Research City"
+                  className="w-full bg-[var(--color-surface-variant)] text-[var(--color-on-surface)] font-[family-name:var(--font-code-sm)] text-[length:var(--text-code-sm)] px-3 py-2 bevel-inset focus:outline-none placeholder:text-[var(--color-on-surface-variant)]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold text-[var(--color-on-surface-variant)] uppercase tracking-widest mb-2">
+                  CHOOSE BLUEPRINT / STARTER TEMPLATE:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {TEMPLATES.map(tpl => {
+                    const isSelected = selectedTemplateId === tpl.id;
+                    return (
+                      <div
+                        key={tpl.id}
+                        onClick={() => {
+                          const oldTemplate = TEMPLATES.find(t => t.id === selectedTemplateId);
+                          setSelectedTemplateId(tpl.id);
+                          if (!newSectorName.trim() || (oldTemplate && newSectorName === oldTemplate.defaultCityName)) {
+                            setNewSectorName(tpl.defaultCityName);
+                          }
+                        }}
+                        className={`p-3 border-2 cursor-pointer transition-all flex flex-col justify-between select-none ${
+                          isSelected
+                            ? 'border-[#23ff47] bg-[#23ff47]/10 shadow-[3px_3px_0_0_#1d1b1a]'
+                            : 'border-[var(--color-on-surface)] bg-[var(--color-surface-variant)]/60 hover:bg-[var(--color-surface-variant)]'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between gap-1 mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className={`material-symbols-outlined text-[18px] ${
+                                  isSelected ? 'text-[#00871d] font-bold' : 'text-[var(--color-on-surface-variant)]'
+                                }`}
+                              >
+                                {tpl.icon}
+                              </span>
+                              <span className="font-bold text-[12px] font-[family-name:var(--font-code-sm)] text-[var(--color-on-surface)]">
+                                {tpl.name}
+                              </span>
+                            </div>
+                            {tpl.badge && (
+                              <span className="text-[9px] font-mono font-bold uppercase px-1.5 py-0.2 bg-black text-amber-300 shadow-sm border border-amber-400/40 shrink-0">
+                                {tpl.badge}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-[var(--color-on-surface-variant)] font-[family-name:var(--font-code-sm)] line-clamp-3 leading-relaxed">
+                            {tpl.description}
+                          </p>
+                        </div>
+                        <div className="mt-2.5 pt-2 border-t border-[var(--color-on-surface)]/20 flex items-center justify-between text-[10px] text-[var(--color-on-surface-variant)] font-mono">
+                          <span>{tpl.category}</span>
+                          {isSelected && (
+                            <span className="text-[#00871d] font-bold flex items-center gap-0.5">
+                              <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                              SELECTED
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <button
+                disabled={isCreating || !newSectorName.trim()}
+                type="submit"
+                className="bg-[#23ff47] hover:bg-[#1ee03e] text-[#002203] font-[family-name:var(--font-label-caps)] text-[length:var(--text-label-caps)] font-bold px-4 py-2.5 border-2 border-[var(--color-on-surface)] shadow-[3px_3px_0_0_#1d1b1a] cursor-pointer w-full mt-2 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">build</span>
+                {isCreating ? 'INITIALIZING BLUEPRINT...' : 'START CONSTRUCTION'}
               </button>
             </div>
           </form>

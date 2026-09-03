@@ -27,6 +27,7 @@ export function buildNodeContext(
         // Only set lastOutput if it hasn't been set yet (immediate upstream node wins)
         if (context.lastOutput === undefined) {
           context.lastOutput = output;
+          context.lastoutput = output;
         }
       }
 

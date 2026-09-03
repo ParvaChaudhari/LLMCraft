@@ -1,3 +1,4 @@
+import { useRef, useEffect, useLayoutEffect } from 'react';
 import DiamondHighlight from './DiamondHighlight';
 import NodeControls from './NodeControls';
 
@@ -10,12 +11,19 @@ interface BillboardData {
   isLoading?: boolean;
 }
 
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 export default function BillboardNode({ id, data, selected }: { id: string; data: BillboardData; selected?: boolean }) {
   const title = data?.title || 'NOTE';
   const content = data?.content || 'Edit message in SidePanel';
   const theme = data?.theme || 'classic';
   const align = data?.align || 'center';
   const fontSize = data?.fontSize || 'md';
+
+  const boardRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const titleRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Theme color styling
   const themeStyles = {
@@ -49,11 +57,58 @@ export default function BillboardNode({ id, data, selected }: { id: string; data
     },
   }[theme];
 
-  const fontSizes = {
-    sm: { title: 'text-[9px]', text: 'text-[7px]' },
-    md: { title: 'text-[11px]', text: 'text-[8.5px]' },
-    lg: { title: 'text-[13px]', text: 'text-[10px]' },
-  }[fontSize];
+  // Auto-fit loop: dynamically shrinks font size until entire text fits inside the billboard frame
+  useIsomorphicLayoutEffect(() => {
+    const board = boardRef.current;
+    const inner = innerRef.current;
+    const titleEl = titleRef.current;
+    const contentEl = contentRef.current;
+    if (!board || !inner) return;
+
+    // Base target sizes based on user's preference
+    const baseTitle = fontSize === 'lg' ? 14 : fontSize === 'sm' ? 10 : 12;
+    const baseContent = fontSize === 'lg' ? 10 : fontSize === 'sm' ? 7.5 : 8.8;
+
+    let tSize = baseTitle;
+    let cSize = baseContent;
+
+    if (titleEl) {
+      titleEl.style.fontSize = `${tSize}px`;
+      titleEl.style.lineHeight = '1.15';
+    }
+    if (contentEl) {
+      contentEl.style.fontSize = `${cSize}px`;
+      contentEl.style.lineHeight = '1.2';
+    }
+
+    const maxBoardHeight = board.clientHeight;
+    const maxBoardWidth = board.clientWidth;
+
+    // 1. If title alone overflows horizontally, scale title down until it fits width
+    if (titleEl) {
+      let titleSafety = 0;
+      while (titleEl.scrollWidth > maxBoardWidth - 10 && tSize > 6.5 && titleSafety < 25) {
+        tSize -= 0.4;
+        titleEl.style.fontSize = `${tSize}px`;
+        titleSafety++;
+      }
+    }
+
+    // 2. Shrink content and title font sizes smoothly until everything fits within the board height
+    let safety = 0;
+    while (inner.scrollHeight > maxBoardHeight - 8 && (cSize > 4 || tSize > 6) && safety < 45) {
+      if (cSize > 4) {
+        cSize -= 0.3;
+        if (contentEl) contentEl.style.fontSize = `${cSize}px`;
+      }
+      // Proportionally scale title if content is already getting small
+      if (cSize < 7 && tSize > 6) {
+        tSize -= 0.25;
+        if (titleEl) titleEl.style.fontSize = `${tSize}px`;
+      }
+      safety++;
+    }
+  }, [title, content, fontSize, align]);
 
   return (
     <div className="relative group" style={{ width: 192, height: 128 }}>
@@ -76,7 +131,8 @@ export default function BillboardNode({ id, data, selected }: { id: string; data
 
         {/* Isometric Text Overlay mapped directly onto the billboard face */}
         <div
-          className="absolute overflow-hidden p-1.5 flex flex-col justify-center select-none"
+          ref={boardRef}
+          className="absolute overflow-hidden p-2 select-none"
           style={{
             left: '22%',
             top: '16.5%',
@@ -90,20 +146,27 @@ export default function BillboardNode({ id, data, selected }: { id: string; data
             textAlign: align,
           }}
         >
-          <div
-            className={`font-[family-name:var(--font-label-caps)] font-bold uppercase tracking-wider truncate leading-tight ${fontSizes.title}`}
-            style={{ color: themeStyles.titleColor }}
-          >
-            {title}
-          </div>
-          {content && (
+          <div ref={innerRef} className="w-full h-full flex flex-col justify-start">
+            {/* Title: wraps and scales down till it fits inside the frame without truncating */}
             <div
-              className={`font-[family-name:var(--font-code-sm)] leading-tight mt-0.5 line-clamp-3 overflow-hidden ${fontSizes.text}`}
-              style={{ color: themeStyles.textColor }}
+              ref={titleRef}
+              className="font-[family-name:var(--font-label-caps)] font-bold uppercase tracking-wider break-words"
+              style={{ color: themeStyles.titleColor }}
             >
-              {content}
+              {title}
             </div>
-          )}
+
+            {/* Content: scales down till it fits inside the frame without truncating */}
+            {content && (
+              <div
+                ref={contentRef}
+                className="font-[family-name:var(--font-code-sm)] break-words mt-1"
+                style={{ color: themeStyles.textColor }}
+              >
+                {content}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

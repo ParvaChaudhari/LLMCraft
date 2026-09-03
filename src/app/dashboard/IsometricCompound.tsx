@@ -268,7 +268,14 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
             appears coplanar with the left wall — facing the same direction. */}
         <g>
           {(() => {
-            const bW = 160;  // width of sign panel
+            const trimmedName = name.trim() || 'UNNAMED CITY';
+            const upperText = trimmedName.toUpperCase();
+
+            // Maximum width available on the left wall (left wall total width is rW / 2 = 270)
+            const maxSignW = 232;
+            const minSignW = 150;
+            const estSignW = upperText.length * 10.5 + 32;
+            const bW = Math.min(maxSignW, Math.max(minSignW, estSignW));  // dynamic width of sign panel
             const bH = 28;   // height of sign panel
             const thick = 3; // 3D thickness
             
@@ -299,8 +306,24 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
             const topPoints = `${f_tl.x},${f_tl.y} ${f_tr.x},${f_tr.y} ${tr.x},${tr.y} ${tl.x},${tl.y}`;
             const rightPoints = `${f_tr.x},${f_tr.y} ${f_br.x},${f_br.y} ${br.x},${br.y} ${tr.x},${tr.y}`;
 
+            // Scale font size continuously down until the full name fits safely within the board
+            const innerTextW = bW - 20;
+            const approxCharWidthRatio = 0.62;
+            const calculatedFont = Math.floor(innerTextW / (upperText.length * approxCharWidthRatio));
+            const fontSize = Math.min(14, Math.max(6.5, calculatedFont));
+            const letterSpacing = fontSize < 9 ? '0.02em' : fontSize < 12 ? '0.05em' : '0.08em';
+
+            const clipId = `sign-clip-${workflow.id}`;
+
             return (
               <>
+                <defs>
+                  {/* Clip path ensures text strictly stays inside the front face boundaries */}
+                  <clipPath id={clipId}>
+                    <polygon points={frontPoints} />
+                  </clipPath>
+                </defs>
+
                 {/* 3D Sides */}
                 <polygon points={topPoints} fill="#2a3f52" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
                 <polygon points={rightPoints} fill="#121b24" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
@@ -308,26 +331,28 @@ export default function IsometricCompound({ workflow, onClick, selected }: Isome
                 {/* Front Face */}
                 <polygon points={frontPoints} fill="#1d2b38" stroke="#4e7a9e" strokeWidth="1" strokeLinejoin="round" />
 
-                {/* Name text — positioned at the visual centre of the front face */}
+                {/* Name text — positioned at the visual centre of the front face and clipped */}
                 {(() => {
                   const cx = f_bl.x + bW / 2;
                   const cy = f_bl.y - bH / 2 + (bW * slope) / 2;
                   const angle = Math.atan(slope) * (180 / Math.PI);
                   return (
-                    <g transform={`translate(${cx}, ${cy}) skewY(${angle})`}>
-                      <text
-                        x="0"
-                        y="1" // slight manual visual vertical tweak
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill="#a8c4d8"
-                        fontFamily="JetBrains Mono, monospace"
-                        fontSize="16"
-                        fontWeight="700"
-                        letterSpacing="0.12em"
-                      >
-                        {name.toUpperCase()}
-                      </text>
+                    <g clipPath={`url(#${clipId})`}>
+                      <g transform={`translate(${cx}, ${cy}) skewY(${angle})`}>
+                        <text
+                          x="0"
+                          y="1" // slight manual visual vertical tweak
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          fill="#a8c4d8"
+                          fontFamily="JetBrains Mono, monospace"
+                          fontSize={fontSize}
+                          fontWeight="700"
+                          letterSpacing={letterSpacing}
+                        >
+                          {upperText}
+                        </text>
+                      </g>
                     </g>
                   );
                 })()}

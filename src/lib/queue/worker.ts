@@ -55,6 +55,18 @@ const resolvePath = (context: any, path: string) => {
   const baseKey = parts[0]; // e.g., 'webhook_1' or 'lastOutput'
   
   let baseValue = context[baseKey];
+
+  // Case-insensitive & snake_case fallback (e.g. {{lastoutput}} or {{last_output}})
+  if (baseValue === undefined && context) {
+    const cleanKey = baseKey.toLowerCase().replace(/_/g, '');
+    if (cleanKey === 'lastoutput' && context.lastOutput !== undefined) {
+      baseValue = context.lastOutput;
+    } else {
+      const match = Object.keys(context).find(k => k.toLowerCase() === baseKey.toLowerCase());
+      if (match) baseValue = context[match];
+    }
+  }
+
   if (baseValue === undefined) return undefined;
   
   // If there are no nested parts, just return the base value directly
@@ -85,10 +97,11 @@ const resolvePath = (context: any, path: string) => {
   }
 };
 
-// Helper for template variable interpolation
+// Helper for template variable interpolation: supports {{variable}} and ((variable))
 const replaceVariables = (text: string, context: any) => {
   if (!text || typeof text !== 'string') return text;
-  return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+  // Match both {{variable}} and ((variable))
+  return text.replace(/(?:\{\{|\(\()([^})]+)(?:\}\}|\)\))/g, (match, key) => {
     const trimmedKey = key.trim();
     const resolvedValue = resolvePath(context, trimmedKey);
     return resolvedValue !== undefined ? String(resolvedValue) : match;
